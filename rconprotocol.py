@@ -11,7 +11,7 @@ class Rcon():
         self.ip = ip
         self.password = password
         self.port = int(Port)
-        self.consolelog = streamWriter
+        self.writeConsole = streamWriter
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         except socket.error:
@@ -51,7 +51,7 @@ class Rcon():
 
 
     def sendCommand(self, toSendCommand):
-        # request =  "B" + "E" + chr(crc1) + chr(crc2) + chr(crc3) + chr(crc4) + command
+        # request =  "B" + "E" + 4 bytes crc check + command
         command = bytearray()
         command.append(0xFF)
         command.append(0x01)
@@ -73,7 +73,7 @@ class Rcon():
         #return request
 
     def _sendLogin(self, passwd):
-        # request =  "B" + "E" + chr(crc1) + chr(crc2) + chr(crc3) + chr(crc4) + command
+        # request =  "B" + "E" + 4 bytes crc check + command
         command = bytearray()
         command.append(0xFF)
         command.append(0x00)
@@ -119,40 +119,42 @@ class Rcon():
         except:
             pass
 
-
-
         #READ THE STREAM
-        if self.consolelog is True:
+        if self.writeConsole is True:
+            #a = datetime.datetime.now()
+            #stream = packet[0].decode('ascii', 'replace')
+            #streamlist = stream.split()                             #Split the steam to be able to remove first byte
+            #streamlist[0] = "[%s:%s:%s]: " % (a.hour, a.minute, a.second)                                    #Remove the first byte
+            #steamjoined = str.join(' ', streamlist)
+            #print(steamjoined.lstrip(' '))
+
 
             a = datetime.datetime.now()
-
-            stream = packet[0].decode('utf-8', 'ignore')
-            streamlist = stream.split()                             #Split the steam to be able to remove first byte
-            streamlist[0] = "[%s:%s:%s]: " % (a.hour, a.minute, a.second)                                    #Remove the first byte
-
-            print(str.join(' ', streamlist))
+            stream = packet[0]
+            stream = stream[9:].decode('ascii', 'replace')
+            streamWithTime = "[%s:%s:%s]: %s" % (a.hour, a.minute, a.second, stream)
+            print(streamWithTime)
 
 
 
-    def connect(self, printStream=False):
+
+    def connect(self):
         while(1):
             try :
                 #msg = input('Enter message to send : ')
                 #Set the whole string
                 print("Connected loop (Normal behavior)\n")
                 self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
-                time.sleep(1)
 
 
                 #prevent disconnection
-
                 t = threading.Thread(target=self._noTimeout)
                 t.start()
 
                 # receive data from client (data, addr)
                 #time.sleep(3)
                 while True:
-                    d = self.s.recvfrom(1024)
+                    d = self.s.recvfrom(2048)           #1024 is better value
                     self._streamReader(d)
                     #time.sleep(1)
                 break
