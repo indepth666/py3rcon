@@ -8,7 +8,7 @@ This is a very early Battleye Rcon communication protocol coded in Python3
 
 Exemple program that use the library.
 ```
-
+import threading
 import rconprotocol
 
 password = "somepasswd"
