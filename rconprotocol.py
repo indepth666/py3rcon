@@ -12,17 +12,24 @@ class Rcon():
         self.password = password
         self.port = int(Port)
         self.writeConsole = streamWriter
+
+        self.lastMessageTimer = 0
+
+
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         except socket.error:
             print ('Failed to create socket')
             sys.exit()
 
-
-
+    def _secondsCounter(self):
+        while True:
+            time.sleep(1)
+            self.lastMessageTimer += 1
+            print(self.lastMessageTimer)
 
     def _compute_crc(self, Bytes):
-        buf = memoryview(Bytes)                     #used to be buf = memoryview(Bytes)
+        buf = memoryview(Bytes)
         crc = binascii.crc32(buf) & 0xffffffff
         crc32 = '0x%08x' % crc
         return int(crc32[8:10], 16), int(crc32[6:8], 16), int(crc32[4:6], 16), int(crc32[2:4], 16)
@@ -47,11 +54,9 @@ class Rcon():
             self.s.sendto(request ,(self.ip, self.port))
             #print("Just sent timeout empty packet\n")
 
-
-
-
     def sendCommand(self, toSendCommand):
         # request =  "B" + "E" + 4 bytes crc check + command
+
         command = bytearray()
         command.append(0xFF)
         command.append(0x01)
@@ -74,6 +79,7 @@ class Rcon():
 
     def _sendLogin(self, passwd):
         # request =  "B" + "E" + 4 bytes crc check + command
+        time.sleep(1)
         command = bytearray()
         command.append(0xFF)
         command.append(0x00)
@@ -109,7 +115,8 @@ class Rcon():
         return request
 
     def _streamReader(self, packet):
-        #ACKNOWLEDGE THE MESSAGE:
+        #ACKNOWLEDGE THE MESSAGE
+        self.lastMessageTimer = 0
         p = packet[0]
         try:
             if p[0:2] == b'BE':
@@ -119,16 +126,8 @@ class Rcon():
         except:
             pass
 
-        #READ THE STREAM
+        #READ THE STREAM AND PRINT() IT
         if self.writeConsole is True:
-            #a = datetime.datetime.now()
-            #stream = packet[0].decode('ascii', 'replace')
-            #streamlist = stream.split()                             #Split the steam to be able to remove first byte
-            #streamlist[0] = "[%s:%s:%s]: " % (a.hour, a.minute, a.second)                                    #Remove the first byte
-            #steamjoined = str.join(' ', streamlist)
-            #print(steamjoined.lstrip(' '))
-
-
             a = datetime.datetime.now()
             stream = packet[0]
             stream = stream[9:].decode('ascii', 'replace')
@@ -151,12 +150,21 @@ class Rcon():
                 t = threading.Thread(target=self._noTimeout)
                 t.start()
 
+                secondTimer = threading.Thread(target=self._secondsCounter)
+                secondTimer.start()
+
                 # receive data from client (data, addr)
                 #time.sleep(3)
                 while True:
-                    d = self.s.recvfrom(2048)           #1024 is better value
+                    d = self.s.recvfrom(2048)           #1024 value crash on players request on full server
                     self._streamReader(d)
-                    #time.sleep(1)
+
+                    if self.lastMessageTimer > 120:
+                        print("[WARNING]: Last message received 120 seconds ago... -> Reconnecting")
+                        self.lastMessageTimer = 0
+                        self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
+
+
                 break
 
             # Some problem sending data ??
