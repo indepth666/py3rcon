@@ -26,7 +26,13 @@ class Rcon():
         while True:
             time.sleep(1)
             self.lastMessageTimer += 1
-            print(self.lastMessageTimer)
+            if self.lastMessageTimer > 90:
+                print("[WARNING]: No message received for ", str(self.lastMessageTimer), " seconds, will try to reconnect at 120seconds")
+            if self.lastMessageTimer > 120:
+                print("[WARNING]: Last message received 120 seconds ago... -> Reconnecting")
+                self.lastMessageTimer = 0
+                self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
+
 
     def _compute_crc(self, Bytes):
         buf = memoryview(Bytes)
@@ -159,17 +165,12 @@ class Rcon():
                     d = self.s.recvfrom(2048)           #1024 value crash on players request on full server
                     self._streamReader(d)
 
-                    if self.lastMessageTimer > 120:
-                        print("[WARNING]: Last message received 120 seconds ago... -> Reconnecting")
-                        self.lastMessageTimer = 0
-                        self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
-
-
                 break
 
             # Some problem sending data ??
             except socket.error as e:
-                pass
+                #pass
+                print('Error... Disconnection? ' + str(e[0]) + ' Message ' + e[1])
                 #print ('Error Code : ' + str(e[0]) + ' Message ' + e[1])
                 #sys.exit()
 
