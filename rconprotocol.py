@@ -27,7 +27,7 @@ class Rcon():
             time.sleep(1)
             self.lastMessageTimer += 1
             if self.lastMessageTimer > 90:
-                print("[WARNING]: No message received for ", str(self.lastMessageTimer), " seconds, will try to reconnect at 120seconds")
+                print("[Server: %s:%s] [WARNING]: No message received for " % (self.ip,self.port), str(self.lastMessageTimer), " seconds, will try to reconnect at 120seconds")
             if self.lastMessageTimer > 120:
                 print("[WARNING]: Last message received 120 seconds ago... -> Reconnecting")
                 self.lastMessageTimer = 0
@@ -137,20 +137,21 @@ class Rcon():
             a = datetime.datetime.now()
             stream = packet[0]
             stream = stream[9:].decode('ascii', 'replace')
-            streamWithTime = "[%s:%s:%s]: %s" % (a.hour, a.minute, a.second, stream)
+            streamWithTime = "[Server: %s:%s] [%s:%s:%s]: %s" % (self.ip, self.port, a.hour, a.minute, a.second, stream)
             print(streamWithTime)
 
             split = stream.split(' ')
 
             #Write GUID&NAME
-            if len(split) > 6:
-                if split[0] == "Verified" and \
-                    split[1] == "GUID" and \
-                    split[3] == "of":
-                    guid = split[2]
-                    playername =  split[6:]
-                    pname = str.join(" ", playername)
-                    print("Player: ", pname, " Guid: ", guid[1:-1])          
+            if False:
+                if len(split) > 6:
+                    if split[0] == "Verified" and \
+                        split[1] == "GUID" and \
+                        split[3] == "of":
+                        guid = split[2]
+                        playername =  split[6:]
+                        pname = str.join(" ", playername)
+                        print("Player: ", pname, " Guid: ", guid[1:-1])
 
 
 

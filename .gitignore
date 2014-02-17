@@ -9,3 +9,4 @@ main.py
 .idea/workspace.xml
 __pycache__/rconprotocol.cpython-33.pyc
 __pycache__/rconprotocol.cpython-32.pyc
+__pycache__/messenger.cpython-33.pyc
