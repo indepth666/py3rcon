@@ -140,6 +140,20 @@ class Rcon():
             streamWithTime = "[%s:%s:%s]: %s" % (a.hour, a.minute, a.second, stream)
             print(streamWithTime)
 
+            split = stream.split(' ')
+
+            #Write GUID&NAME
+            if len(split) > 6:
+                if split[0] == "Verified" and \
+                    split[1] == "GUID" and \
+                    split[3] == "of":
+                    guid = split[2]
+                    playername =  split[6:]
+                    pname = str.join(" ", playername)
+                    print("Player: ", pname, " Guid: ", guid[1:-1])          
+
+
+
 
 
 
