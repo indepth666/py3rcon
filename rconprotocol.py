@@ -12,8 +12,8 @@ class Rcon():
         self.password = password
         self.port = int(Port)
         self.writeConsole = streamWriter
-
         self.lastMessageTimer = 0
+        self.messagesTimer = 10 * 60                        #USED BY THE MESSENGER
 
 
         try:
@@ -153,6 +153,19 @@ class Rcon():
                         pname = str.join(" ", playername)
                         print("Player: ", pname, " Guid: ", guid[1:-1])
 
+    def _messengerThread(self,rtime,messageList):
+        print("IMPORTANT: MESSENGER STARTED\n")
+        while True:
+            for i in range(0,len(messageList)):
+                self.sendCommand("say -1 \"%s\"" % messageList[i])
+                time.sleep(rtime)
+
+
+
+    def messengers(self, messagesAsList, timeBetweenMessage=10):
+        rtime = timeBetweenMessage * 60
+        t = threading.Thread(target=self._messengerThread, args=(rtime, messagesAsList))
+        t.start()
 
 
 
