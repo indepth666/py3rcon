@@ -1,0 +1,26 @@
+{
+    "server": {
+	"host":"127.0.0.1",
+	"port":2402,
+	"rcon_password":"yourRconPassword"
+    },
+    "admins": ["123412341324","321412341234"],
+    "restart": {
+	"interval": 240,
+	"exitonrestart": true,
+	"messages": [
+	    [10, "RESTART IN 10 MINUTES"],
+	    [ 5, "RESTART IN 5 MINUTES" ],
+	    [ 3, "RESTART IN 3 MINUTES" ],
+	    [ 1, "RESTART IN 1 MINUTE"  ]
+	]
+    },
+    "repeatMessage":{
+	"interval": 20,
+	"messages": [
+	    "Besuch uns auf: www.die-bluescreen-crew.de",
+	    "Du befindest die auf dem D.B.C. Exile Esseker Server",
+            "Unser Teamspeak: www.die-bluecreen-crew.de"
+	]
+    }
+}
