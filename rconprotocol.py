@@ -3,11 +3,25 @@ import sys
 import binascii
 import time, datetime
 import threading
+import sched
 
+class RestartMessage():
+
+    def __init__(self, min, message):
+        self.min = min
+        self.message = message
+
+    def toSecond(self):
+	return self.min * 60
 
 class Rcon():
 
+    Timeout = 60
+    KeepAlive = 40
+    AutoReconnect = 70
+
     def __init__(self, ip,password,Port,streamWriter=True):
+	self.sched = sched.scheduler(time.time, time.sleep)
         self.ip = ip
         self.password = password
         self.port = int(Port)
@@ -15,6 +29,9 @@ class Rcon():
         self.lastMessageTimer = 0
         self.messagesTimer = 10 * 60                        #USED BY THE MESSENGER
 
+	self.shutdownTimer = 0
+	self.restartMessages = None
+	self.hasRestarted = 1
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -26,13 +43,13 @@ class Rcon():
         while True:
             time.sleep(1)
             self.lastMessageTimer += 1
-            if self.lastMessageTimer > 90:
-                print("[Server: %s:%s] [WARNING]: No message received for " % (self.ip,self.port), str(self.lastMessageTimer), " seconds, will try to reconnect at 120seconds")
-            if self.lastMessageTimer > 120:
-                print("[WARNING]: Last message received 120 seconds ago... -> Reconnecting")
+            if self.lastMessageTimer > self.Timeout:
+                print "[Server: {}:{}] [WARNING]: No message received for {} seconds - Try to reconnect shortly".format(self.ip,self.port, self.lastMessageTimer)
+            if self.lastMessageTimer > self.AutoReconnect:
+                print "[WARNING]: Last message received {} seconds ago. Reconnecting!".format(self.AutoReconnect)
                 self.lastMessageTimer = 0
                 self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
-
+		self._initRestartScheduler()
 
     def _compute_crc(self, Bytes):
         buf = memoryview(Bytes)
@@ -40,14 +57,12 @@ class Rcon():
         crc32 = '0x%08x' % crc
         return int(crc32[8:10], 16), int(crc32[6:8], 16), int(crc32[4:6], 16), int(crc32[2:4], 16)
 
-    def _noTimeout(self):
+    def _keepAlive(self):
         while True:
-            time.sleep(40)
+            time.sleep(self.KeepAlive)
             command = bytearray()
             command.append(0xFF)
             command.append(0x01)
-            command.append(0x00)
-            command.append(0x00)
             command.append(0x00)
 
             request = bytearray(b'BE')
@@ -58,7 +73,6 @@ class Rcon():
             request.append(crc4)
             request.extend(command)
             self.s.sendto(request ,(self.ip, self.port))
-            #print("Just sent timeout empty packet\n")
 
     def sendCommand(self, toSendCommand):
         # request =  "B" + "E" + 4 bytes crc check + command
@@ -81,8 +95,6 @@ class Rcon():
         except:
             print("Error occured with Rcon.sendCommand")
 
-        #return request
-
     def _sendLogin(self, passwd):
         # request =  "B" + "E" + 4 bytes crc check + command
         time.sleep(1)
@@ -100,8 +112,6 @@ class Rcon():
         request.extend(command)
 
         return request
-        #return request
-
 
     def _acknowledge(self, Bytes):
         command = bytearray()
@@ -143,33 +153,84 @@ class Rcon():
             split = stream.split(' ')
 
             #Write GUID&NAME
-            if False:
-                if len(split) > 6:
-                    if split[0] == "Verified" and \
-                        split[1] == "GUID" and \
-                        split[3] == "of":
-                        guid = split[2]
-                        playername =  split[6:]
-                        pname = str.join(" ", playername)
-                        print("Player: ", pname, " Guid: ", guid[1:-1])
+            if len(split) > 6:
+                if split[0] == "Verified" and \
+                    split[1] == "GUID" and \
+                    split[3] == "of":
+                    guid = split[2]
+                    playername =  split[6:]
+                    pname = str.join(" ", playername)
+                    print("Player: ", pname, " Guid: ", guid[1:-1])
 
     def _messengerThread(self,rtime,messageList):
-        print("IMPORTANT: MESSENGER STARTED\n")
+        print "NOTE: Initialized the Messenger thread\n"
         while True:
             for i in range(0,len(messageList)):
                 self.sendCommand("say -1 \"%s\"" % messageList[i])
                 time.sleep(rtime)
 
-
-
     def messengers(self, messagesAsList, timeBetweenMessage=10):
         rtime = timeBetweenMessage * 60
         t = threading.Thread(target=self._messengerThread, args=(rtime, messagesAsList))
+	t.daemon = True
         t.start()
 
+    def _restartMessageTask(self, msg):
+	print 'Sending Restart Message: %s' % msg
+	self.sendCommand("say -1 \"%s\"" % msg)
+	
 
 
 
+    def kickAll(self):
+	print 'Kick All players executed'
+	for i in range(1, 100):
+	    self.sendCommand('#kick {}'.format(i))
+	    time.sleep(0.1)
+
+
+    def lockServer(self):
+	self.sendCommand('#lock')
+	time.sleep(1)
+
+    def _shutdownTask(self):
+	self.lockServer();
+	self.kickAll()
+
+	# wait some seconds before restarting
+	time.sleep(30)
+
+	self.sendCommand('#shutdown')
+
+	self.hasRestarted = 1
+	#self.sendCommand('players')
+
+    def _initRestartScheduler(self):
+	if self.hasRestarted == 1:
+	
+	    print 'NOTE: Initialized the Restarter thread'
+
+	    if not self.sched.empty():
+		for q in self.sched.queue:
+		    self.sched.cancel(q)
+
+	    self.sched.enter(self.shutdownTimer, 1, self._shutdownTask, ())
+
+	    self.hasRestarted = 0
+
+	    if type(self.restartMessages) is list:
+        	for msg in self.restartMessages:
+		    if int(self.shutdownTimer - msg.toSecond()) > 0:
+			self.sched.enter( self.shutdownTimer - msg.toSecond(), 1, self._restartMessageTask, (msg.message,) )
+
+	    self.sched.run()
+
+    def shutdown(self, shutdownInterval, restartMessageAsList):
+	rtime = shutdownInterval * 60
+	self.shutdownTimer = rtime
+	self.restartMessages = restartMessageAsList
+
+	threading.Thread(target=self._initRestartScheduler).start();
 
     def connect(self):
         while(1):
@@ -179,12 +240,13 @@ class Rcon():
                 print("Connected loop (Normal behavior)\n")
                 self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
 
-
-                #prevent disconnection
-                t = threading.Thread(target=self._noTimeout)
+                # send keep alive package every X seconds
+                t = threading.Thread(target=self._keepAlive)
+		t.daemon = True
                 t.start()
 
                 secondTimer = threading.Thread(target=self._secondsCounter)
+		secondTimer.daemon = True
                 secondTimer.start()
 
                 # receive data from client (data, addr)
@@ -202,10 +264,6 @@ class Rcon():
                 #print ('Error Code : ' + str(e[0]) + ' Message ' + e[1])
                 #sys.exit()
 
-
-
             # Ctrl + C
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, SystemExit):
                 break
-
-
