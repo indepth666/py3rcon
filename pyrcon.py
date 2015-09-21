@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, signal, sys, argparse, threading, rconprotocol, json
+import os, signal, sys, argparse, threading, rconprotocol, json, logging
 
 def restart_program():
     print 'Restarting program'
@@ -39,15 +39,24 @@ print '# DO NOT FORGET TO SETUP THE beserver.cfg LOCATED IN battleye/ FOLDER #'
 print '#'.ljust(71, '#')
 print ''
 
+# Logging tool configuration
+print 'Logging to: {}'.format(config['logfile'])
+FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
+logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
+
 pidfile = '/tmp/pyrcon.{}.run'.format(config['server']['port'])
 
 if os.path.isfile(pidfile):
-    print 'pyrcon is already running for {}:{}'.format(config['server']['host'], config['server']['port'])
+    _tmp = 'pyrcon is already running for {}:{}'.format(config['server']['host'], config['server']['port'])
+    print _tmp
+    logging.info(_tmp)
     exit()
 
 open(pidfile, 'w').write(pid)
 
-rcon = rconprotocol.Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'])
+logging.debug("Initialize rconprotocol class object")
+
+rcon = rconprotocol.Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'], True, config['restart']['exitonrestart'])
 
 # Display messages to all players ever X interval (sequencial)
 # Usage: rcon.messengers(<List of Messages>, <delay in minutes>)
@@ -56,13 +65,12 @@ rcon.messengers( config['repeatMessage']['messages'], config['repeatMessage']['i
 
 # Define a shutdown interval (requires the server be started under WATCHDOG - FOR RESTART)
 # Usage: rcon.shutdown(<time in minutes>, <List of RestartMessage objects>)
-rcon.shutdown(1, [
-                        rconprotocol.RestartMessage(15, 'RESTART IN 15 MINUTES'),
-                        rconprotocol.RestartMessage(10, 'RESTART IN 10 MINUTES'),
-                        rconprotocol.RestartMessage( 5, 'RESTART IN 5 MINUTES'),
-                        rconprotocol.RestartMessage( 3, 'RESTART IN 3 MINUTES'),
-                        rconprotocol.RestartMessage( 1, 'RESTART IN 1 MINUTE'),
-                ])
+
+_rlist = []
+for m in config['restart']['messages']:
+    _rlist.append( rconprotocol.RestartMessage(m[0],m[1]) )
+
+rcon.shutdown(config['restart']['interval'], _rlist)
 
 # Establish the RCON connection
 rcon.connect()
