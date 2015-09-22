@@ -4,17 +4,7 @@ import sys
 import binascii
 import time, datetime
 import threading
-import sched
 import logging
-
-class RestartMessage():
-
-    def __init__(self, min, message):
-        self.min = min
-        self.message = message
-
-    def toSecond(self):
-	return self.min * 60
 
 class Rcon():
 
@@ -23,29 +13,21 @@ class Rcon():
     ConnectionRetries = 6 # Try to reconnect (at startup) X times and...
     ConnectionInterval = 10 # ... try it every 10 seconds. Example (6 tries X 10 seconds = 60 seconds until server should be up)
 
-    def __init__(self, ip, password, Port, streamWriter=True, exitOnRestart=False):
+    def __init__(self, ip, password, Port, streamWriter=True):
 	# constructor parameters
         self.ip = ip
         self.password = password
         self.port = int(Port)
         self.writeConsole = streamWriter
 
+	# connection handler for modules
+	self.handlerConnect = []
+
 	# last timestamp used for checkinh keepalive
-	self.exitOnRestart = exitOnRestart
 	self.isExit = False
 	self.isAuthenticated = False
 	self.retry = 0
 	self.lastcmd = ""
-
-	# shutdown and shutdown message scheduler
-	self.sched = sched.scheduler(time.time, time.sleep)
-	self.shutdownTimer = 0
-	self.restartMessages = None
-
-	# chat messages
-	self.repeatMessages = None
-	self.repeatMessageInterval = 0
-	self.repeatMessageIndex = 0
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -54,26 +36,28 @@ class Rcon():
 	    logging.error('rconprotocol: Failed to created socket: {}'.format(serr))
             sys.exit()
 
-    def _messageLoop(self):
-	logging.info('Message loop thread initialized')
+    def loadmodule(self, name, cls, optClasses = []):
+	_lst = [cls] + optClasses
 
-	_counter = 0;
-        while not self.isExit:
+	mod = __import__('lib.' + name, fromlist=_lst)
+	#mod = importlib.import_module('lib.' + name)
+
+	classT = getattr(mod, cls);
+	clsObj = classT(self)
+	if "OnConnected" in dir(clsObj):
+	    self.handlerConnect.append(clsObj.OnConnected)
+
+	return clsObj
+
+    def _keepAliveThread(self):
+	_counter = 0
+	while not self.isExit:
 	    time.sleep(1)
 	    _counter += 1
-	
-	    # when counter hits KeepAlive interval, call _sendKeepAlive
 	    if _counter%self.KeepAlive == 0:
-		self._sendKeepAlive()
+		self.sendCommand(None)
 
-	    # check every repeatMessageInterval if chat message need to be sent
-	    if self.repeatMessageInterval > 0 and _counter%self.repeatMessageInterval == 0:
-		t = threading.Thread(target=self._sendSequentialMessageThread, args=())
-		t.daemon = True
-		t.start()
-	    
-	    # not neccessary need, but to have it porperly
-	    if _counter > 0xffffffff:
+	    if _counter > self.KeepAlive:
 		_counter = 0
 
     def _compute_crc(self, Bytes):
@@ -81,9 +65,6 @@ class Rcon():
         crc = binascii.crc32(buf) & 0xffffffff
         crc32 = '0x%08x' % crc
         return int(crc32[8:10], 16), int(crc32[6:8], 16), int(crc32[4:6], 16), int(crc32[2:4], 16)
-
-    def _sendKeepAlive(self):
-	self.sendCommand(None)
 
     def sendCommand(self, toSendCommand):
 	if not self.isAuthenticated:
@@ -113,14 +94,6 @@ class Rcon():
         request.extend(command)
         #try:
         self.s.sendto(request ,(self.ip, self.port))
-
-	# Connection timed out
-	#except socket.timeout as et:
-	#    logging.error('Socket timeout: {}'.format(et))
-
-        # Some problem sending data ??
-        #except socket.error as e:
-	#    logging.error('Socket error: {}'.format(e))
 
     def _sendLogin(self, passwd):
 	logging.debug('Sending login information')
@@ -183,7 +156,7 @@ class Rcon():
 		# Only do the below if this is the initial connect call
 		if not self.isAuthenticated:
 		    self.isAuthenticated = True
-		    self._initThreads()
+		    self.OnConnected()
 	    # when authentication failed, exit the program
 	    elif stream[6:] == "\xff\x00\x00":
 		logging.error("Not Authenticated")
@@ -212,30 +185,10 @@ class Rcon():
                     pname = str.join(" ", playername)
 		    logging.info('Player {} with Guid: {}'.format(pname, guid[1:-1]))
 
-    
-    def _sendSequentialMessageThread(self):
-	_l = len(self.repeatMessages)
-	_index = self.repeatMessageIndex
-	if _l > 0 and not self.repeatMessages[_index] == None:
-	    self.sendChat(self.repeatMessages[_index])
-	
-	if (_index + 1) >= _l:
-	    self.repeatMessageIndex = 0
-	else:
-	    self.repeatMessageIndex += 1
 
     def sendChat(self, msg):
 	self.sendCommand("say -1 \"%s\"" % msg)
 
-    def messengers(self, messagesAsList, timeBetweenMessage=10, beginWith = 0):
-	self.repeatMessages = messagesAsList
-	self.repeatMessageInterval = timeBetweenMessage * 60;
-	self.repeatMessageIndex = beginWith
-
-    def _restartMessageTask(self, msg):
-	logging.info('Sending restart message: {}'.format(msg))
-	self.sendCommand("say -1 \"%s\"" % msg)
-	
     def kickAll(self):
 	logging.info('Kick All player before restart take action')
 	for i in range(1, 100):
@@ -246,55 +199,22 @@ class Rcon():
 	self.sendCommand('#lock')
 	time.sleep(1)
 
-    def _shutdownTask(self):
-	self.lockServer();
-	self.kickAll()
-
-	# wait some seconds before restarting
-	logging.info('Delay the shutdown process')
-	time.sleep(30)
+    def OnConnected(self):
+	# initialize keepAlive thread
+	_t = threading.Thread(target=self._keepAliveThread)
+	_t.deamon = True
+	_t.start()
 	
-	logging.info('Sending shutdown command')
-	self.sendCommand('#shutdown')
+	if len(self.handlerConnect) > 0:
+	    for conn in self.handlerConnect:
+		conn()
 
-    def _emptyScheduler(self):
-	if not self.sched.empty():
-	    for q in self.sched.queue:
-	        self.sched.cancel(q)
+    def IsAborted(self):
+	return self.isExit
 
-    def _initRestartScheduler(self):
-	logging.info('Initialized the restarter thread')
-	
-	# make sure all previous scheds are being removed
-	self._emptyScheduler()
-	self.sched.enter(self.shutdownTimer, 1, self._shutdownTask, ())
-
-	if type(self.restartMessages) is list:
-    	    for msg in self.restartMessages:
-		if int(self.shutdownTimer - msg.toSecond()) > 0:
-		    self.sched.enter( self.shutdownTimer - msg.toSecond(), 1, self._restartMessageTask, (msg.message,) )
-	
-	self.sched.run()
-	logging.debug('All shutdown tasks executed')
-	if self.exitOnRestart:
-	    logging.info('Exit Pyrcon...')
-	    self.isExit = True
-
-    def shutdown(self, shutdownInterval, restartMessageAsList):
-	self.shutdownTimer = shutdownInterval * 60
-	self.restartMessages = restartMessageAsList
-
-    def _initThreads(self):
-	# a message loop to handle keepAlive, connection timeouts and global chat messages
-        t = threading.Thread(target=self._messageLoop)
-	t.daemon = True
-    	t.start()
-
-	# a separate thread to handle the restart and restart messages
-	# It is set as daemon to be able to stop it using SystemExit or Ctrl + C
-	t = threading.Thread(target=self._initRestartScheduler)
-	t.daemon = True
-	t.start()
+    def Abort(self):
+	logging.info("Exit loop")
+	self.isExit = True
 
     def connect(self):
         try:

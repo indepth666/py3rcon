@@ -1,11 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python -B
 
-import os, signal, sys, argparse, threading, rconprotocol, json, logging
-
-def restart_program():
-    print 'Restarting program'
-    python = sys.executable
-    os.execl(python, python, * sys.argv)
+import os, signal, sys, argparse, threading, json, logging
+import lib
+from lib.rconprotocol import Rcon
 
 def signal_term_handler(signal, frame):
     sys.exit(0)
@@ -56,26 +53,34 @@ open(pidfile, 'w').write(pid)
 
 logging.debug("Initialize rconprotocol class object")
 
-rcon = rconprotocol.Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'], True, config['restart']['exitonrestart'])
+##
+# Initialize the rconprotocol class
+##
+rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'], True)
 
-# Display messages to all players ever X interval (sequencial)
-# Usage: rcon.messengers(<List of Messages>, <delay in minutes>)
-
-rcon.messengers( config['repeatMessage']['messages'], config['repeatMessage']['interval'])
-
-# Define a shutdown interval (requires the server be started under WATCHDOG - FOR RESTART)
-# Usage: rcon.shutdown(<time in minutes>, <List of RestartMessage objects>)
-
+##
+# Load the rconrestart module and setup from configuration
+##
+modRestart = rcon.loadmodule('rconrestart', 'RconRestart', ['RestartMessage'])
 _rlist = []
 for m in config['restart']['messages']:
-    _rlist.append( rconprotocol.RestartMessage(m[0],m[1]) )
+    _rlist.append( lib.rconrestart.RestartMessage(m[0],m[1]) )
 
-rcon.shutdown(config['restart']['interval'], _rlist)
+modRestart.setMessages( _rlist )
+modRestart.setInterval( config['restart']['interval'] )
+modRestart.setExitOnRestart(config['restart']['exitonrestart'])
 
-# Establish the RCON connection
+##
+# Load the rconmessage module and setup from configuration
+##
+modMessage = rcon.loadmodule('rconmessage', 'RconMessage')
+modMessage.setInterval( config['repeatMessage']['interval'] )
+modMessage.setMessages( config['repeatMessage']['messages'] )
+
+##
+# Connect to server
+##
 rcon.connect()
 
 # remove PID
 os.unlink(pidfile)
-# and restart the program
-#restart_program()
