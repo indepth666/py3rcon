@@ -1,6 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python -B
 
-import os, signal, sys, argparse, threading, rconprotocol
+import os, signal, sys, argparse, threading, json, logging
+import lib
+from lib.rconprotocol import Rcon
 
 def signal_term_handler(signal, frame):
     sys.exit(0)
@@ -10,43 +12,74 @@ signal.signal(signal.SIGTERM, signal_term_handler)
 pid = str(os.getpid())
 
 parser = argparse.ArgumentParser(description='Python Rcon cmdlet for ARMA3 Servers')
-parser.add_argument('host', help='server host')
-parser.add_argument('port', help='server port')
-parser.add_argument('password', help='admin rcon password')
+parser.add_argument('configfile', help='configuration file in JSON')
 
 args = parser.parse_args()
 
+if not os.path.isfile(args.configfile):
+    print ''
+    print ' -- Configuration not found: "{}" --\n'.format(args.configfile)
+    exit(1)
+
+with open(args.configfile) as json_config:
+    config = json.load(json_config)
+
+_bstr = os.path.basename(args.configfile)
+_n = 48 - len(_bstr)
+
+print 'PyRcon for ARMA3 CLI v0.1'
 print ''
-print '#######################################################################'
+print '#'.ljust(71, '#')
+print '# Configuration file: {}{}#'.format(_bstr , ''.ljust(_n, ' '))
+print '#'.ljust(71, '#')
 print '# DO NOT FORGET TO SETUP THE beserver.cfg LOCATED IN battleye/ FOLDER #'
-print '#######################################################################'
+print '#'.ljust(71, '#')
 print ''
 
-pidfile = '/tmp/pyrcon.{}.run'.format(args.port)
+# Logging tool configuration
+print 'Logging to: {}'.format(config['logfile'])
+FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
+logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
+
+pidfile = '/tmp/pyrcon.{}.run'.format(config['server']['port'])
 
 if os.path.isfile(pidfile):
-    print 'pyrcon is already running for {}:{}'.format(args.host, args.port)
+    _tmp = 'pyrcon is already running for {}:{}'.format(config['server']['host'], config['server']['port'])
+    print _tmp
+    logging.info(_tmp)
     exit()
 
 open(pidfile, 'w').write(pid)
 
-rcon = rconprotocol.Rcon(args.host,args.password, args.port)
+logging.debug("Initialize rconprotocol class object")
 
-# Display messages to all players ever X interval (sequencial)
-# Usage: rcon.messengers(<List of Messages>, <delay in minutes>)
-rcon.messengers(['','Besucht uns auf: www.die-bluiescreen-crew.de','Du befindest die auf dem D.B.C. Exile Esseker Server', 'Unser Teamspeak: www.die-bluecreen-crew.de'], 20)
+##
+# Initialize the rconprotocol class
+##
+rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'], True)
 
-# Define a shutdown interval (requires the server be started under WATCHDOG - FOR RESTART)
-# Usage: rcon.shutdown(<time in minutes>, <List of RestartMessage objects>)
-rcon.shutdown(240, [
-                        rconprotocol.RestartMessage(15, 'RESTART IN 15 MINUTES'),
-                        rconprotocol.RestartMessage(10, 'RESTART IN 10 MINUTES'),
-                        rconprotocol.RestartMessage( 5, 'RESTART IN 5 MINUTES'),
-                        rconprotocol.RestartMessage( 3, 'RESTART IN 3 MINUTES'),
-                        rconprotocol.RestartMessage( 1, 'RESTART IN 1 MINUTE'),
-                ])
+##
+# Load the rconrestart module and setup from configuration
+##
+modRestart = rcon.loadmodule('rconrestart', 'RconRestart', ['RestartMessage'])
+_rlist = []
+for m in config['restart']['messages']:
+    _rlist.append( lib.rconrestart.RestartMessage(m[0],m[1]) )
 
-# Establish the RCON connection
+modRestart.setMessages( _rlist )
+modRestart.setInterval( config['restart']['interval'] )
+modRestart.setExitOnRestart(config['restart']['exitonrestart'])
+
+##
+# Load the rconmessage module and setup from configuration
+##
+modMessage = rcon.loadmodule('rconmessage', 'RconMessage')
+modMessage.setInterval( config['repeatMessage']['interval'] )
+modMessage.setMessages( config['repeatMessage']['messages'] )
+
+##
+# Connect to server
+##
 rcon.connect()
 
 # remove PID
