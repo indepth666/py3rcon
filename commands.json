@@ -1,0 +1,8 @@
+{
+    "admins": [123123123, 123123132, 1231313123],
+    "commands": [
+	["!kickall", "int", "rconprotocol.kickAll"],
+	["!reload",  "int", "rconcommand.loadConfig" ],
+	["!cancel",  "int", "rconrestart.cancelRestart" ]
+    ]
+}

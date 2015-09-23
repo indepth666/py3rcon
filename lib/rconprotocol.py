@@ -20,8 +20,13 @@ class Rcon():
         self.port = int(Port)
         self.writeConsole = streamWriter
 
-	# connection handler for modules
-	self.handlerConnect = []
+	# connection handler
+	self.handleConnect = []
+	# player connect and disconnect handler
+	self.handlePlayerConnect = []
+	self.handlePlayerDisconnect = []
+	# handle chat messages
+	self.handleChat = []
 
 	# last timestamp used for checkinh keepalive
 	self.isExit = False
@@ -40,12 +45,20 @@ class Rcon():
 	_lst = [cls] + optClasses
 
 	mod = __import__('lib.' + name, fromlist=_lst)
-	#mod = importlib.import_module('lib.' + name)
 
 	classT = getattr(mod, cls);
 	clsObj = classT(self)
 	if "OnConnected" in dir(clsObj):
-	    self.handlerConnect.append(clsObj.OnConnected)
+	    self.handleConnect.append(clsObj.OnConnected)
+
+	if "OnPlayerConnect" in dir(clsObj):
+	    self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
+
+	if "OnPlayerDisconnect" in dir(clsObj):
+	    self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
+
+	if "OnChat" in dir(clsObj):
+	    self.handleChat.append(clsObj.OnChat)
 
 	return clsObj
 
@@ -161,7 +174,7 @@ class Rcon():
 	    elif stream[6:] == "\xff\x00\x00":
 		logging.error("Not Authenticated")
 		exit()
-	    # keepAlive package received
+	    # success message from the server for the previous command (or keep alive)
 	    elif stream[6:] == "\xff\x01\x00" and self.lastcmd:
 		stream = "ACK {}".format(self.lastcmd)
 	    elif stream[6:] == "\xff\x01\x00" and not self.lastcmd:
@@ -169,7 +182,7 @@ class Rcon():
 	    # all other packages and commands
 	    else:
 		stream = stream[9:].decode('ascii', 'replace')
-
+	
 	    logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
 	    logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
@@ -199,14 +212,29 @@ class Rcon():
 	self.sendCommand('#lock')
 	time.sleep(1)
 
+    def OnPlayerConnect(self):
+	if len(self.handlePlayerConnect) > 0:
+	    for pconn in self.handlePlayerConnect:
+		pconn()
+
+    def OnPlayerDisconnect(self):
+	if len(self.handlePlayerDisconnect) > 0:
+	    for pdis in self.handlePlayerDisconnect:
+		pdis()
+
+    def OnChat(self, message):
+	if len(self.handleChat) > 0:
+	    for cmsg in self.handleChat:
+		cmsg(message)
+
     def OnConnected(self):
 	# initialize keepAlive thread
 	_t = threading.Thread(target=self._keepAliveThread)
 	_t.deamon = True
 	_t.start()
 	
-	if len(self.handlerConnect) > 0:
-	    for conn in self.handlerConnect:
+	if len(self.handleConnect) > 0:
+	    for conn in self.handleConnect:
 		conn()
 
     def IsAborted(self):
@@ -215,6 +243,9 @@ class Rcon():
     def Abort(self):
 	logging.info("Exit loop")
 	self.isExit = True
+	# send the final kill and force socket to call recvfrom (and dont wait for an answer)
+	self.s.settimeout(0.0)
+	self.sendCommand(None)
 
     def connect(self):
         try:
@@ -241,4 +272,5 @@ class Rcon():
 
         # Ctrl + C
         except (KeyboardInterrupt, SystemExit):
+	    self.Abort()
 	    logging.debug('rconprotocol.connect: Keyboard interrupted')

@@ -23,6 +23,7 @@ class RconRestart():
         self.restartMessages = None
 	self.exitOnRestart = False
 
+	self.canceled = False	
 
 	self.rcon = rcon
 
@@ -44,9 +45,9 @@ class RconRestart():
 	    t = threading.Thread(target=self._initRestartScheduler)
 	    t.daemon = True
 	    t.start()
-	    logging.info('OnConnect(): Initialized the restarter thread')
+	    logging.info('OnConnect(): %s ready to restart server every %d seconds' % (self.__class__, self.shutdownTimer))
 	else:
-	    logging.info("OnConnect(): Restart module disabled")
+	    logging.info("OnConnect(): %s disabled" % self.__class__)
 
     def _restartMessageTask(self, msg):
         logging.info('Sending restart message: {}'.format(msg))
@@ -68,6 +69,14 @@ class RconRestart():
             for q in self.sched.queue:
                 self.sched.cancel(q)
 
+    def cancelRestart(self):
+	self.canceled = True
+	self._emptyScheduler()
+	self.rcon.sendCommand("say -1 \"RESTART CANCELED\"")
+
+	# Cancel the current shutdown timer, BUT continue with regular restarts
+	self.OnConnected()
+
     def _initRestartScheduler(self):
         # make sure all previous scheds are being removed
         self._emptyScheduler()
@@ -80,6 +89,7 @@ class RconRestart():
 
         self.sched.run()
         logging.debug('All shutdown tasks executed')
-        if self.exitOnRestart:
+        if self.exitOnRestart and not self.canceled:
             self.rcon.Abort()
 
+	self.canceled = False
