@@ -1,10 +1,11 @@
 {
+    "logfile":"pyrcon.test.log",
+    "loglevel": 10,
     "server": {
 	"host":"127.0.0.1",
 	"port":2402,
 	"rcon_password":"yourRconPassword"
     },
-    "admins": ["123412341324","321412341234"],
     "restart": {
 	"interval": 240,
 	"exitonrestart": true,
