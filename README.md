@@ -1,21 +1,12 @@
 pythonBERCon
 ============
 
-Python3 Battleye Rcon protocol
-This is a very early Battleye Rcon communication protocol coded in Python3
+PythonBERCon is a Python3 client for Battleye Rcon protocol. 
+It's designed with ARMA2 and ARMA3 in mind but may also work with other implemenation of the protocol.
 
 
+How to use?
+===========
 
-Exemple program that use the library.
-```
-import threading
-import rconprotocol
-
-password = "somepasswd"
-host = '69.39.239.100'
-port = 2302
-rcon = rconprotocol.Rcon(host,password, port)
-
-t = threading.Thread(target=rcon.connect)
-t.start()
-```
+Configuration example can be found in configexample.json.
+then ./pyrcon.py configfile
