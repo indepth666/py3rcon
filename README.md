@@ -17,14 +17,13 @@ Configuration explained
 Please note the configuration is stored JSON file.
 This format usually does not allow comments.
 
-
-**logfile: "pyrcon.log"** - Logfile name
-**loglevel: 10** - Loglevel (10 = show debug info, 20 = show info messages, 30 = show error and warnings only)
-
-**server -> host: "<ip address/hostname>"** - Ip address of the armaX server
-**server -> port: "<port>"** - Ip address of the armaX server
-**server -> rcon_password: "<pw>"** - Rcon password
-
-**restart -> interval: <minutes>** - Restart interval in minutes
-**restart -> exitonrestart: <booloean>** - Exit the application when restart interval has reached
+Config entry          | Example       | Description
+--------------------- | ------------- | -----------
+logfile               | pyrcon.log    | File name of the pyrcon log
+loglevel              | 10            | Loglevel (10 = show debug info, 20 = exclude debug info, 30 = display only error and warnings)
+server : host         | 127.0.0.1     | Hostname of the armaX server
+server : port         | 2402          | Port of the armaX server
+server : rcon_password| yourPW        | Rcon password
+restart : interval    | 240           | Restart interval in minutes
+restart : exitonrestart| true         | End the application when restart interval has reached
 
