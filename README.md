@@ -10,3 +10,4 @@ How to use?
 
 Configuration example can be found in configexample.json.
 then ./pyrcon.py configfile
+
