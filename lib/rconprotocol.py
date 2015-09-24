@@ -194,13 +194,13 @@ class Rcon():
 	    # all other packages and commands
 	    else:
 		stream = stream[9:].decode('ascii', 'replace')
-		self._parseReply(stream)
+		self._parseResponse(stream)
 	
 	    logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
 	    logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
 
-    def _parseReply(self, msg):
+    def _parseResponse(self, msg):
 	m = re.match("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", msg)
 	if m:
 	    self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
