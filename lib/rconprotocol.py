@@ -277,7 +277,7 @@ class Rcon():
 	# Connection timed out
 	except socket.timeout as et:
 	    logging.error('Socket timeout: {}'.format(et))
-	    if self.retry < self.ConnectionRetries:
+	    if self.retry < self.ConnectionRetries and not self.isExit:
 		self.retry += 1
 		self.connect()
 
