@@ -79,19 +79,21 @@ class RconCommand():
 	else:
 	    logging.info('OnConnect(): %s disabled' % self.__class__)
 
-    def OnPlayerConnect(self):
+    def OnPlayerConnect(self, player):
 	# do some action when player connects
-	logging.debug('OnPlayerConnect(): %s' % self.__class__)
+	logging.debug('OnPlayerConnect(): %s - Player: %s' % (self.__class__, player.name))
 
-    def OnPlayerDisconnect(self):
+    def OnPlayerDisconnect(self, player):
 	# do some action when player disconnects
-	logging.debug('OnPlayerDisconnect(): %s' % self.__class__)
+	logging.debug('OnPlayerDisconnect(): %s - Player: %s' % (self.__class__, player.name))
 
-    def OnChat(self, message):
+    def OnChat(self, obj):
 	# do some action when player sends a chat message
-	for c in cmdList:
-	    if c.Match(message):
-		if c.Mode() == 'int':
-		    eval(c.Command())
-		else:
-		    rconprotocol.sendCommand( c.Command() )
+	logging.info("RconCommand: %s - %s" % (obj.channel, obj.message))
+
+	#for c in self.cmdList:
+	#    if c.Match(obj.message):
+	#	if c.Mode() == 'int':
+	#	    eval(c.Command())
+	#	else:
+	#	    rconprotocol.sendCommand( c.Command() )
