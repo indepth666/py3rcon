@@ -9,7 +9,8 @@ How to use?
 ===========
 
 Configuration example can be found in configexample.json.
-then ./pyrcon.py configfile
+
+<pre>Usage: ./pyrcon.py &lt;configfile&gt;</pre>
 
 Configuration explained
 =======================
