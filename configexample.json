@@ -6,6 +6,7 @@
 	"port":2402,
 	"rcon_password":"yourRconPassword"
     },
+    "commands": "commands.json",
     "restart": {
 	"interval": 240,
 	"exitonrestart": true,

@@ -5,6 +5,7 @@ import binascii
 import time, datetime
 import threading
 import logging
+import importlib
 import re
 
 class Player():
@@ -14,8 +15,9 @@ class Player():
 	self.name = name
 
 class ChatMessage():
-    def __init__(self, channel, message):
+    def __init__(self, channel, sender, message):
 	self.channel = channel.lower()
+	self.sender = sender
 	self.message = message
 
 class Rcon():
@@ -31,6 +33,9 @@ class Rcon():
         self.password = password
         self.port = int(Port)
         self.writeConsole = streamWriter
+
+	# module instances as dict (to have them loaded only once)
+	self._instances = {}
 
 	# connection handler
 	self.handleConnect = []
@@ -53,26 +58,28 @@ class Rcon():
 	    logging.error('rconprotocol: Failed to created socket: {}'.format(serr))
             sys.exit()
 
-    def loadmodule(self, name, cls, optClasses = []):
-	_lst = [cls] + optClasses
+    def loadmodule(self, name, cls):
+	if type(self).__name__ == cls:
+	    return self
 
-	mod = __import__('lib.' + name, fromlist=_lst)
+	key = "%s.%s" % (name, cls)
+	if not key in self._instances.keys():
+	    mod = importlib.import_module('lib.' + name)
+	    classT = getattr(mod, cls);
+	    clsObj = classT(self)
 
-	classT = getattr(mod, cls);
-	clsObj = classT(self)
-	if "OnConnected" in dir(clsObj):
-	    self.handleConnect.append(clsObj.OnConnected)
+	    if "OnConnected" in dir(clsObj):
+		self.handleConnect.append(clsObj.OnConnected)
+	    if "OnPlayerConnect" in dir(clsObj):
+		self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
+	    if "OnPlayerDisconnect" in dir(clsObj):
+		self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
+	    if "OnChat" in dir(clsObj):
+		self.handleChat.append(clsObj.OnChat)
+	    
+	    self._instances[key] = clsObj
 
-	if "OnPlayerConnect" in dir(clsObj):
-	    self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
-
-	if "OnPlayerDisconnect" in dir(clsObj):
-	    self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
-
-	if "OnChat" in dir(clsObj):
-	    self.handleChat.append(clsObj.OnChat)
-
-	return clsObj
+	return self._instances[key]
 
     def _keepAliveThread(self):
 	_counter = 0
@@ -211,7 +218,7 @@ class Rcon():
 	    else:
 		m = re.match("\(([A-Za-z]+)\) (.*?): (.*)", msg)
 		if m:
-		    self.OnChat( ChatMessage( m.group(1), m.group(3)) )
+		    self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
 		
 
     def sendChat(self, msg):
@@ -291,5 +298,5 @@ class Rcon():
 	    logging.debug('rconprotocol.connect: Keyboard interrupted')
 
 	except:
-	    logging.error('Unhandled Error: ')
-	    logging.error(sys.exc_info())
+	    logging.exception("Unhandled Exception")
+	    self.Abort()

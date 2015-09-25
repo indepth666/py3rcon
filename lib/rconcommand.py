@@ -8,38 +8,39 @@ import json
 
 class RconCommandItem():
     
-    def __init__(self, regMatch, mode, command):
+    def __init__(self, regMatch, command):
 	self.regMatch = regMatch
-	self.mode = mode.lower()
 	self.command = command
-        self.__parsed = False
 
     def Match(self, message):
-	m = re.match("^" + re.escape(self.regMatch), message )
+	m = re.match(re.escape(self.regMatch), message )
 
-	if m: self.__parse(m.groups)
+	if m: 
+	    self.__parse(m.groups)
 
 	return m
 
-    def __parse(self, groups):
-	if self.__parsed: return
-	
-	self.command = self.command % tuple(groups)
-	self.__parsed = True
+    def Execute(self, rcon):
+	param = self.command.split(':')
+	# run a usual server side command
+	if len(param) <= 1:
+	    rcon.sendCommand(self.command)
+	# run commands from core Rcon class
+	elif len(param) <= 2 and param[0].lower() == type(rcon).__name__.lower():
+	    getattr(rcon, param[1])()
+	elif len(param) >= 3:
+	    clsObj = rcon.loadmodule( param[0], param[1] )
+	    getattr(clsObj, param[2])()
+	else:
+	    logging.warning("Command '%s' matching '%s' is misconfigured" % (self.command, self.regMatch))
 
-    def Command(self):
-	return self.command
 
-    def Mode(self):
-	return self.mode
-    
-
-class RconCommand():
-
+class RconCommand(object):
     def __init__(self, rcon):
 	self.configFile = None
         self.adminList = []
 	self.cmdList = []
+	self.players = []
 
 	self.rcon = rcon
 
@@ -71,7 +72,7 @@ class RconCommand():
 	self.cmdList = []
 	if len(commandList) > 0:
 	    for c in commandList:
-		self.cmdList.append( RconCommandItem( c[0], c[1], c[2] ) )
+		self.cmdList.append( RconCommandItem( c[0], c[1] ) )
 
     def OnConnected(self):
 	if self.loadConfig():
@@ -83,17 +84,28 @@ class RconCommand():
 	# do some action when player connects
 	logging.debug('OnPlayerConnect(): %s - Player: %s' % (self.__class__, player.name))
 
+	if player.guid in self.adminList:
+	    self.rcon.sendChat("Admin '%s' connected" % player.name)
+
+	self.players.append(player)
+
     def OnPlayerDisconnect(self, player):
 	# do some action when player disconnects
 	logging.debug('OnPlayerDisconnect(): %s - Player: %s' % (self.__class__, player.name))
+	
+	found = filter(lambda x: x.number == player.number, self.players)
+	if(len(found) > 0):
+	    self.players.remove(found[0])
 
     def OnChat(self, obj):
 	# do some action when player sends a chat message
 	logging.info("RconCommand: %s - %s" % (obj.channel, obj.message))
-
-	#for c in self.cmdList:
-	#    if c.Match(obj.message):
-	#	if c.Mode() == 'int':
-	#	    eval(c.Command())
-	#	else:
-	#	    rconprotocol.sendCommand( c.Command() )
+	try:
+	    found = filter(lambda x: x.name == obj.sender, self.players)
+	    if len(found) > 0 and found[0].guid in self.adminList:
+		for c in self.cmdList:
+		    logging.info(c)
+		    if c.Match(obj.message):
+			c.Execute(self.rcon)
+	except:
+	    logging.warning("Error in message: %s" % obj.message)

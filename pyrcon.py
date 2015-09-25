@@ -57,12 +57,8 @@ rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config[
 # Load the rconrestart module and setup from configuration
 ##
 if not(GUI):
-    modRestart = rcon.loadmodule('rconrestart', 'RconRestart', ['RestartMessage'])
-    _rlist = []
-    for m in config['restart']['messages']:
-        _rlist.append( lib.rconrestart.RestartMessage(m[0],m[1]) )
-
-    modRestart.setMessages( _rlist )
+    modRestart = rcon.loadmodule('rconrestart', 'RconRestart')
+    modRestart.setMessages( config['restart']['messages'] )
     modRestart.setInterval( config['restart']['interval'] )
     modRestart.setExitOnRestart(config['restart']['exitonrestart'])
 
@@ -74,11 +70,13 @@ if not(GUI):
     modMessage.setInterval( config['repeatMessage']['interval'] )
     modMessage.setMessages( config['repeatMessage']['messages'] )
 
-    if 'commands' in config:
-	modCommand = rcon.loadmodule('rconcommand', 'RconCommand')
-	_p = os.path.abspath(os.path.dirname(sys.argv[0]))
-        modCommand.setConfig( _p + '/' + config['commands'] )
-
+##
+# Load the rcon admin commands module
+##
+if not(GUI) and 'commands' in config:
+    modCommand = rcon.loadmodule('rconcommand', 'RconCommand')
+    _p = os.path.abspath(os.path.dirname(sys.argv[0]))
+    modCommand.setConfig( _p + '/' + config['commands'] )
 
 if GUI:
     modGUI = rcon.loadmodule('rcongui', 'RconGUI')

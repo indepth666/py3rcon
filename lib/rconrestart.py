@@ -14,8 +14,7 @@ class RestartMessage():
         return self.min * 60
 
 
-class RconRestart():
-
+class RconRestart(object):
     def __init__(self, rcon):
         # shutdown and shutdown message scheduler
         self.sched = sched.scheduler(time.time, time.sleep)
@@ -33,7 +32,9 @@ class RconRestart():
 	self.shutdownTimer = min * 60
 
     def setMessages(self, messageList):
-	self.restartMessages = messageList
+	self.restartMessages = []
+    	for m in messageList:
+	    self.restartMessages.append( RestartMessage(m[0],m[1]) )
 
     def setExitOnRestart(self, yesNo):
 	self.exitOnRestart = yesNo

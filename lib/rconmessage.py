@@ -4,8 +4,7 @@ import logging
 import threading
 import time
 
-class RconMessage():
-
+class RconMessage(object):
     def __init__(self, rcon):
         # chat messages
         self.msgList = None
