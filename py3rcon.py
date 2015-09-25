@@ -11,7 +11,10 @@ signal.signal(signal.SIGTERM, signal_term_handler)
 
 pid = str(os.getpid())
 
-parser = argparse.ArgumentParser(description='Python Rcon cmdlet for ARMA3 Servers')
+_DESC = 'Python Rcon CLI for Arma3 Servers'
+_VER  = '0.1b'
+
+parser = argparse.ArgumentParser(description=_DESC)
 parser.add_argument('configfile', help='configuration file in JSON')
 parser.add_argument('-g','--gui', action='store_true',help='open the GUI - no other events are enabled')
 args = parser.parse_args()
@@ -29,7 +32,8 @@ with open(args.configfile) as json_config:
 _bstr = os.path.basename(args.configfile)
 _n = 48 - len(_bstr)
 
-print 'PyRcon for ARMA3 CLI v0.1 using configuration {}'.format(_bstr)
+print '{} using configuration {}'.format(_DESC, _bstr)
+print 'version: %s' % _VER
 print ''
 
 # Logging tool configuration
