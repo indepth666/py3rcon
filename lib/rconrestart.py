@@ -26,7 +26,7 @@ class RconRestart(object):
 
 	self.rcon = rcon
 
-	logging.debug('RconRestart() initialized')
+	logging.debug('%s() initialized' % type(self).__name__)
 
     def setInterval(self, min):
 	self.shutdownTimer = min * 60
@@ -46,9 +46,9 @@ class RconRestart(object):
 	    t = threading.Thread(target=self._initRestartScheduler)
 	    t.daemon = True
 	    t.start()
-	    logging.info('OnConnect(): %s ready to restart server every %d seconds' % (self.__class__, self.shutdownTimer))
+	    logging.info('OnConnect(): %s ready to restart server every %d seconds' % (type(self).__name__, self.shutdownTimer))
 	else:
-	    logging.info("OnConnect(): %s disabled" % self.__class__)
+	    logging.info("OnConnect(): %s disabled" % type(self).__name__)
 
     def _restartMessageTask(self, msg):
         logging.info('Sending restart message: {}'.format(msg))

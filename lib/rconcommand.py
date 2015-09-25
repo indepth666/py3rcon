@@ -44,18 +44,18 @@ class RconCommand(object):
 
 	self.rcon = rcon
 
-	logging.debug('%s: initialized' % self.__class__)
+	logging.debug('%s: initialized' % type(self).__name__)
 
     def setConfig(self, configFile):
 	self.configFile = configFile
     
     def loadConfig(self):
 	if self.configFile is None:
-	    logging.error('%s: No command config specified' % (self.__class__))
+	    logging.error('%s: No command config specified' % (type(self).__name__))
 	    return False
 
 	if not os.path.isfile(self.configFile):
-	    logging.error('%s: Command list file "%s" not found' % (self.__class__, self.configFile))
+	    logging.error('%s: Command list file "%s" not found' % (type(self).__name__, self.configFile))
 	    return False
 
 	with open(self.configFile) as json_config: 
@@ -76,13 +76,13 @@ class RconCommand(object):
 
     def OnConnected(self):
 	if self.loadConfig():
-	    logging.info('OnConnect(): %s configured (%d commands %d admins)' % (self.__class__, len(self.cmdList), len(self.adminList)))
+	    logging.info('OnConnect(): %s configured (%d commands %d admins)' % (type(self).__name__, len(self.cmdList), len(self.adminList)))
 	else:
-	    logging.info('OnConnect(): %s disabled' % self.__class__)
+	    logging.info('OnConnect(): %s disabled' % type(self).__name__)
 
     def OnPlayerConnect(self, player):
 	# do some action when player connects
-	logging.debug('OnPlayerConnect(): %s - Player: %s' % (self.__class__, player.name))
+	logging.debug('OnPlayerConnect(): %s - Player: %s' % ( type(self).__name__, player.name))
 
 	if player.guid in self.adminList:
 	    self.rcon.sendChat("Admin '%s' connected" % player.name)
@@ -91,7 +91,7 @@ class RconCommand(object):
 
     def OnPlayerDisconnect(self, player):
 	# do some action when player disconnects
-	logging.debug('OnPlayerDisconnect(): %s - Player: %s' % (self.__class__, player.name))
+	logging.debug('OnPlayerDisconnect(): %s - Player: %s' % (type(self).__name__, player.name))
 	
 	found = filter(lambda x: x.number == player.number, self.players)
 	if(len(found) > 0):
