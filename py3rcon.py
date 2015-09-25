@@ -36,10 +36,9 @@ print ''
 print 'Logging to: {}'.format(config['logfile'])
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
+pidfile = '/tmp/py3rcon.{}.run'.format(config['server']['port'])
 
 if not(GUI):
-    pidfile = '/tmp/pyrcon.{}.run'.format(config['server']['port'])
-
     if os.path.isfile(pidfile):
 	_tmp = 'pyrcon is already running for {}:{}'.format(config['server']['host'], config['server']['port'])
 	print _tmp
