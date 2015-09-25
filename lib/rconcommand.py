@@ -14,10 +14,6 @@ class RconCommandItem():
 
     def Match(self, message):
 	m = re.match(re.escape(self.regMatch), message )
-
-	if m: 
-	    self.__parse(m.groups)
-
 	return m
 
     def Execute(self, rcon):
@@ -26,13 +22,13 @@ class RconCommandItem():
 	if len(param) <= 1:
 	    rcon.sendCommand(self.command)
 	# run commands from core Rcon class
-	elif len(param) <= 2 and param[0].lower() == type(rcon).__name__.lower():
+	elif len(param) <= 2:
 	    getattr(rcon, param[1])()
 	elif len(param) >= 3:
 	    clsObj = rcon.loadmodule( param[0], param[1] )
 	    getattr(clsObj, param[2])()
 	else:
-	    logging.warning("Command '%s' matching '%s' is misconfigured" % (self.command, self.regMatch))
+	    logging.warning("Command '%s' matching '%s' is misconfigured (length: %d)" % (self.command, self.regMatch, len(param)))
 
 
 class RconCommand(object):
@@ -109,3 +105,4 @@ class RconCommand(object):
 			c.Execute(self.rcon)
 	except:
 	    logging.warning("Error in message: %s" % obj.message)
+	    logging.exception("Stack Trace:")
