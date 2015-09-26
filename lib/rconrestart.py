@@ -14,8 +14,7 @@ class RestartMessage():
         return self.min * 60
 
 
-class RconRestart():
-
+class RconRestart(object):
     def __init__(self, rcon):
         # shutdown and shutdown message scheduler
         self.sched = sched.scheduler(time.time, time.sleep)
@@ -23,16 +22,19 @@ class RconRestart():
         self.restartMessages = None
 	self.exitOnRestart = False
 
+	self.canceled = False	
 
 	self.rcon = rcon
 
-	logging.debug('RconRestart() initialized')
+	logging.debug('%s() initialized' % type(self).__name__)
 
     def setInterval(self, min):
 	self.shutdownTimer = min * 60
 
     def setMessages(self, messageList):
-	self.restartMessages = messageList
+	self.restartMessages = []
+    	for m in messageList:
+	    self.restartMessages.append( RestartMessage(m[0],m[1]) )
 
     def setExitOnRestart(self, yesNo):
 	self.exitOnRestart = yesNo
@@ -44,9 +46,9 @@ class RconRestart():
 	    t = threading.Thread(target=self._initRestartScheduler)
 	    t.daemon = True
 	    t.start()
-	    logging.info('OnConnect(): Initialized the restarter thread')
+	    logging.info('OnConnect(): %s ready to restart server every %d seconds' % (type(self).__name__, self.shutdownTimer))
 	else:
-	    logging.info("OnConnect(): Restart module disabled")
+	    logging.info("OnConnect(): %s disabled" % type(self).__name__)
 
     def _restartMessageTask(self, msg):
         logging.info('Sending restart message: {}'.format(msg))
@@ -68,6 +70,14 @@ class RconRestart():
             for q in self.sched.queue:
                 self.sched.cancel(q)
 
+    def cancelRestart(self):
+	self.canceled = True
+	self._emptyScheduler()
+	self.rcon.sendCommand("say -1 \"RESTART CANCELED\"")
+
+	# Cancel the current shutdown timer, BUT continue with regular restarts
+	self.OnConnected()
+
     def _initRestartScheduler(self):
         # make sure all previous scheds are being removed
         self._emptyScheduler()
@@ -80,6 +90,7 @@ class RconRestart():
 
         self.sched.run()
         logging.debug('All shutdown tasks executed')
-        if self.exitOnRestart:
+        if self.exitOnRestart and not self.canceled:
             self.rcon.Abort()
 
+	self.canceled = False

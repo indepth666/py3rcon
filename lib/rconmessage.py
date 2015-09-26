@@ -4,8 +4,7 @@ import logging
 import threading
 import time
 
-class RconMessage():
-
+class RconMessage(object):
     def __init__(self, rcon):
         # chat messages
         self.msgList = None
@@ -14,7 +13,7 @@ class RconMessage():
 
 	self.rcon = rcon
 
-	logging.debug('RconMessage() initialized')
+	logging.debug('%s() initialized' % type(self).__name__)
 
     def setInterval(self, min):
 	self.msgInterval = min * 60
@@ -29,9 +28,9 @@ class RconMessage():
     	    t = threading.Thread(target=self._chatMessageLoop)
 	    t.daemon = True
 	    t.start()
-	    logging.debug('OnConnect(): Initialized Messenger')
+	    logging.info('OnConnect(): %s ready to send messages every %d seconds' % (type(self).__name__, self.msgInterval))
 	else:
-	    logging.info('OnConnect(): Messager disabled')
+	    logging.info('OnConnect(): %s disabled' % type(self).__name__)
 
     def _chatMessageLoop(self):
         _l = len(self.msgList)

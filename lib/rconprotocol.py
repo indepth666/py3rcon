@@ -5,6 +5,20 @@ import binascii
 import time, datetime
 import threading
 import logging
+import importlib
+import re
+
+class Player():
+    def __init__(self, no, guid, name):
+	self.number = no
+	self.guid = guid
+	self.name = name
+
+class ChatMessage():
+    def __init__(self, channel, sender, message):
+	self.channel = channel.lower()
+	self.sender = sender
+	self.message = message
 
 class Rcon():
 
@@ -20,8 +34,16 @@ class Rcon():
         self.port = int(Port)
         self.writeConsole = streamWriter
 
-	# connection handler for modules
-	self.handlerConnect = []
+	# module instances as dict (to have them loaded only once)
+	self._instances = {}
+
+	# connection handler
+	self.handleConnect = []
+	# player connect and disconnect handler
+	self.handlePlayerConnect = []
+	self.handlePlayerDisconnect = []
+	# handle chat messages
+	self.handleChat = []
 
 	# last timestamp used for checkinh keepalive
 	self.isExit = False
@@ -36,18 +58,28 @@ class Rcon():
 	    logging.error('rconprotocol: Failed to created socket: {}'.format(serr))
             sys.exit()
 
-    def loadmodule(self, name, cls, optClasses = []):
-	_lst = [cls] + optClasses
+    def loadmodule(self, name, cls):
+	if type(self).__name__ == cls:
+	    return self
 
-	mod = __import__('lib.' + name, fromlist=_lst)
-	#mod = importlib.import_module('lib.' + name)
+	key = "%s.%s" % (name, cls)
+	if not key in self._instances.keys():
+	    mod = importlib.import_module('lib.' + name)
+	    classT = getattr(mod, cls);
+	    clsObj = classT(self)
 
-	classT = getattr(mod, cls);
-	clsObj = classT(self)
-	if "OnConnected" in dir(clsObj):
-	    self.handlerConnect.append(clsObj.OnConnected)
+	    if "OnConnected" in dir(clsObj):
+		self.handleConnect.append(clsObj.OnConnected)
+	    if "OnPlayerConnect" in dir(clsObj):
+		self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
+	    if "OnPlayerDisconnect" in dir(clsObj):
+		self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
+	    if "OnChat" in dir(clsObj):
+		self.handleChat.append(clsObj.OnChat)
+	    
+	    self._instances[key] = clsObj
 
-	return clsObj
+	return self._instances[key]
 
     def _keepAliveThread(self):
 	_counter = 0
@@ -161,7 +193,7 @@ class Rcon():
 	    elif stream[6:] == "\xff\x00\x00":
 		logging.error("Not Authenticated")
 		exit()
-	    # keepAlive package received
+	    # success message from the server for the previous command (or keep alive)
 	    elif stream[6:] == "\xff\x01\x00" and self.lastcmd:
 		stream = "ACK {}".format(self.lastcmd)
 	    elif stream[6:] == "\xff\x01\x00" and not self.lastcmd:
@@ -169,22 +201,25 @@ class Rcon():
 	    # all other packages and commands
 	    else:
 		stream = stream[9:].decode('ascii', 'replace')
-
+		self._parseResponse(stream)
+	
 	    logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
 	    logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
-            split = stream.split(' ')
 
-            #Write GUID&NAME
-            if len(split) > 6:
-                if split[0] == "Verified" and \
-                    split[1] == "GUID" and \
-                    split[3] == "of":
-                    guid = split[2]
-                    playername =  split[6:]
-                    pname = str.join(" ", playername)
-		    logging.info('Player {} with Guid: {}'.format(pname, guid[1:-1]))
-
+    def _parseResponse(self, msg):
+	m = re.match("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", msg)
+	if m:
+	    self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
+	else:
+	    m = re.match("Player #([0-9]+) (.*?) disconnected", msg)
+	    if m:
+		self.OnPlayerDisconnect( Player(m.group(1), "", m.group(2)) )
+	    else:
+		m = re.match("\(([A-Za-z]+)\) (.*?): (.*)", msg)
+		if m:
+		    self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
+		
 
     def sendChat(self, msg):
 	self.sendCommand("say -1 \"%s\"" % msg)
@@ -199,14 +234,29 @@ class Rcon():
 	self.sendCommand('#lock')
 	time.sleep(1)
 
+    def OnPlayerConnect(self, player):
+	if len(self.handlePlayerConnect) > 0:
+	    for pconn in self.handlePlayerConnect:
+		pconn(player)
+
+    def OnPlayerDisconnect(self, player):
+	if len(self.handlePlayerDisconnect) > 0:
+	    for pdis in self.handlePlayerDisconnect:
+		pdis(player)
+
+    def OnChat(self, chatObj):
+	if len(self.handleChat) > 0:
+	    for cmsg in self.handleChat:
+		cmsg(chatObj)
+
     def OnConnected(self):
 	# initialize keepAlive thread
 	_t = threading.Thread(target=self._keepAliveThread)
 	_t.deamon = True
 	_t.start()
 	
-	if len(self.handlerConnect) > 0:
-	    for conn in self.handlerConnect:
+	if len(self.handleConnect) > 0:
+	    for conn in self.handleConnect:
 		conn()
 
     def IsAborted(self):
@@ -215,6 +265,9 @@ class Rcon():
     def Abort(self):
 	logging.info("Exit loop")
 	self.isExit = True
+	# send the final kill and force socket to call recvfrom (and dont wait for an answer)
+	self.s.settimeout(0.0)
+	self.sendCommand(None)
 
     def connect(self):
         try:
@@ -231,7 +284,7 @@ class Rcon():
 	# Connection timed out
 	except socket.timeout as et:
 	    logging.error('Socket timeout: {}'.format(et))
-	    if self.retry < self.ConnectionRetries:
+	    if self.retry < self.ConnectionRetries and not self.isExit:
 		self.retry += 1
 		self.connect()
 
@@ -241,4 +294,9 @@ class Rcon():
 
         # Ctrl + C
         except (KeyboardInterrupt, SystemExit):
+	    self.Abort()
 	    logging.debug('rconprotocol.connect: Keyboard interrupted')
+
+	except:
+	    logging.exception("Unhandled Exception")
+	    self.Abort()
