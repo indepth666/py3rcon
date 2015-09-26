@@ -11,7 +11,7 @@ signal.signal(signal.SIGTERM, signal_term_handler)
 
 pid = str(os.getpid())
 
-_DESC = 'Python Rcon CLI for Arma3 Servers'
+_DESC = 'Python Rcon CLI for Arma servers'
 _VER  = '0.1b'
 
 parser = argparse.ArgumentParser(description=_DESC)

@@ -20,8 +20,8 @@
     "repeatMessage":{
 	"interval": 20,
 	"messages": [
-	    "This Server is using PYRCON.py (python3rcon)",
-	    "Authors: indepth666 (python3rcon), ole1986 (CLI)",
+	    "This Server is using py3rcon.py",
+	    "Authors: indepth666 (Basic protocol design), ole1986 (CLI)",
             "Github: https://github.com/indepth666/python3rcon",
             "Github(forked): https://github.com/ole1986/python3rcon"
 	]
