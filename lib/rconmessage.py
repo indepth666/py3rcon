@@ -4,6 +4,9 @@ import logging
 import threading
 import time
 
+"""
+RconMessage class used to repeatedly sent server info messages
+"""
 class RconMessage(object):
     def __init__(self, rcon):
         # chat messages
@@ -15,12 +18,24 @@ class RconMessage(object):
 
 	logging.debug('%s() initialized' % type(self).__name__)
 
+    """
+    public: set the interval in minutes on how often a message should appear
+    @parama integer min - minute
+    """
     def setInterval(self, min):
 	self.msgInterval = min * 60
 
+    """
+    public: set the messages to be send every interval - check out the setInterval(<min>) method
+    @param List messageList - list of messages as string
+    """
     def setMessages(self, messageList):
 	self.msgList = messageList
 
+    """
+    Event: Called by Rcon.OnConnected() when connection is established and authenticated
+    Used to initialize the chat thread
+    """
     def OnConnected(self):
 	if not (self.msgList is None) and self.msgInterval > 0:
     	    # a separate thread to handle the restart and restart messages
@@ -32,6 +47,10 @@ class RconMessage(object):
 	else:
 	    logging.info('OnConnect(): %s disabled' % type(self).__name__)
 
+    """
+    private: The actual message chat loop.
+    This thread will send the chat message to everyone and sleeps for interval configured by setInterval(<min>) method
+    """
     def _chatMessageLoop(self):
         _l = len(self.msgList)
         _index = self.msgIndex
