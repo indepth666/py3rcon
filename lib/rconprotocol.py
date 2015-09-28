@@ -8,18 +8,18 @@ import logging
 import importlib
 import re
 
-class Player():
-    def __init__(self, no, guid, name):
-	self.number = no
-	self.guid = guid
-	self.name = name
 
-class ChatMessage():
-    def __init__(self, channel, sender, message):
-	self.channel = channel.lower()
-	self.sender = sender
-	self.message = message
+"""
+Rcon protocol class.
+Used to establish the connection and to send keep-alive packages
+Also it provides some default commands, like kickAll, sendChat , lockServer, etc...
 
+The module loader <loadmodule(name, class)> allows the use of the following events:
+- OnConnected
+- OnPlayerConnect
+- OnPlayerDisconnect
+- OnChat
+"""
 class Rcon():
 
     Timeout = 60 # When the connection did not received any response after this period
@@ -27,6 +27,9 @@ class Rcon():
     ConnectionRetries = 6 # Try to reconnect (at startup) X times and...
     ConnectionInterval = 10 # ... try it every 10 seconds. Example (6 tries X 10 seconds = 60 seconds until server should be up)
 
+    """
+    constructor: create an instance by passing ip, password and port as arguments
+    """
     def __init__(self, ip, password, Port, streamWriter=True):
 	# constructor parameters
         self.ip = ip
@@ -58,6 +61,11 @@ class Rcon():
 	    logging.error('rconprotocol: Failed to created socket: {}'.format(serr))
             sys.exit()
 
+    """
+    public: load additional modules.
+    @param string name - module name without .py suffix
+    @param string cls  - class name to create an instance of
+    """
     def loadmodule(self, name, cls):
 	if type(self).__name__ == cls:
 	    return self
@@ -81,6 +89,10 @@ class Rcon():
 
 	return self._instances[key]
 
+    """
+    private: threaded method sending keepAlive messages to the server.
+    Use the KeepAlive constant to define the interval
+    """
     def _keepAliveThread(self):
 	_counter = 0
 	while not self.isExit:
@@ -92,12 +104,20 @@ class Rcon():
 	    if _counter > self.KeepAlive:
 		_counter = 0
 
+    """
+    private: to calculate the crc (Battleye).
+    More Info: http://www.battleye.com/downloads/BERConProtocol.txt
+    """
     def _compute_crc(self, Bytes):
         buf = memoryview(Bytes)
         crc = binascii.crc32(buf) & 0xffffffff
         crc32 = '0x%08x' % crc
         return int(crc32[8:10], 16), int(crc32[6:8], 16), int(crc32[4:6], 16), int(crc32[2:4], 16)
 
+    """
+    public: send individual server commands.
+    @param string toSendCommand - any valid server command, like "#ban <playerid>"
+    """
     def sendCommand(self, toSendCommand):
 	if not self.isAuthenticated:
 	    logging.error('Command failed - Not Authenticated')
@@ -127,6 +147,10 @@ class Rcon():
         #try:
         self.s.sendto(request ,(self.ip, self.port))
 
+    """
+    private: send the magic bytes to login as Rcon admin.
+    More Info: http://www.battleye.com/downloads/BERConProtocol.txt
+    """
     def _sendLogin(self, passwd):
 	logging.debug('Sending login information')
         # request =  "B" + "E" + 4 bytes crc check + command
@@ -146,6 +170,10 @@ class Rcon():
 
         return request
 
+    """
+    private: accept server messages.
+    More Info: http://www.battleye.com/downloads/BERConProtocol.txt
+    """
     def _acknowledge(self, Bytes):
         command = bytearray()
         command.append(0xFF)
@@ -162,6 +190,10 @@ class Rcon():
 
         return request
 
+    """
+    private: handle all incoming server messages from socket.recvfrom method
+    @param unknown packet - received package
+    """
     def _streamReader(self, packet):
 	# reset the retries if from now one some connection problems occured
 	self.retry = 0
@@ -207,6 +239,9 @@ class Rcon():
 	    logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
 
+    """
+    private: parse the incoming message from _streamReader to provide eventing
+    """
     def _parseResponse(self, msg):
 	m = re.match("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", msg)
 	if m:
@@ -220,35 +255,58 @@ class Rcon():
 		if m:
 		    self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
 		
-
+    """
+    public: send a chat message to everyone
+    @param string msg - message text
+    """
     def sendChat(self, msg):
 	self.sendCommand("say -1 \"%s\"" % msg)
 
+    """
+    public: kick all players
+    """
     def kickAll(self):
 	logging.info('Kick All player before restart take action')
 	for i in range(1, 100):
 	    self.sendCommand('#kick {}'.format(i))
 	    time.sleep(0.1)
 
+    """
+    public: lock the server (until next restart/unlock). So nobody can join anymore
+    """
     def lockServer(self):
 	self.sendCommand('#lock')
 	time.sleep(1)
 
+    """
+    Event: when a player connects to the server
+    """
     def OnPlayerConnect(self, player):
 	if len(self.handlePlayerConnect) > 0:
 	    for pconn in self.handlePlayerConnect:
 		pconn(player)
 
+    """
+    Event: when a player disconnects from the server
+    """
     def OnPlayerDisconnect(self, player):
 	if len(self.handlePlayerDisconnect) > 0:
 	    for pdis in self.handlePlayerDisconnect:
 		pdis(player)
 
+    """
+    Event: Incoming chat messages
+    @param ChatMessage chatObj - chat object containing channel and message
+    """
     def OnChat(self, chatObj):
 	if len(self.handleChat) > 0:
 	    for cmsg in self.handleChat:
 		cmsg(chatObj)
 
+    """
+    Event: when program is successfully connected and authenticated to the server.
+	   This can perfectly be used in modules.
+    """
     def OnConnected(self):
 	# initialize keepAlive thread
 	_t = threading.Thread(target=self._keepAliveThread)
@@ -259,9 +317,15 @@ class Rcon():
 	    for conn in self.handleConnect:
 		conn()
 
+    """
+    public: check if program is about to exit
+    """
     def IsAborted(self):
 	return self.isExit
 
+    """
+    public: cancel all loops (keepAlive and others from modules) and send the final "exit" command to disconnect from server
+    """
     def Abort(self):
 	logging.info("Exit loop")
 	self.isExit = True
@@ -269,6 +333,9 @@ class Rcon():
 	self.s.settimeout(0.0)
 	self.sendCommand(None)
 
+    """
+    public: used to establish the connection to the server giving by constructor call
+    """
     def connect(self):
         try:
 	    self.s.settimeout(self.ConnectionInterval)
@@ -300,3 +367,22 @@ class Rcon():
 	except:
 	    logging.exception("Unhandled Exception")
 	    self.Abort()
+
+
+"""
+Player class commonly used for events OnPlayerConnect and OnPlayerDisconnect
+"""
+class Player():
+    def __init__(self, no, guid, name):
+	self.number = no
+	self.guid = guid
+	self.name = name
+
+"""
+Chat class commonly used for event OnChat
+"""
+class ChatMessage():
+    def __init__(self, channel, sender, message):
+	self.channel = channel.lower()
+	self.sender = sender
+	self.message = message
