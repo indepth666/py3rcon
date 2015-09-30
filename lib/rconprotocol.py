@@ -24,8 +24,8 @@ class Rcon():
 
     Timeout = 60 # When the connection did not received any response after this period
     KeepAlive = 40 # KeepAlive must always be lower than Timeout, otherwise the Timeout occurs
-    ConnectionRetries = 6 # Try to reconnect (at startup) X times and...
-    ConnectionInterval = 10 # ... try it every 10 seconds. Example (6 tries X 10 seconds = 60 seconds until server should be up)
+    ConnectionRetries = 5 # Try to reconnect (at startup) X times and...
+    ConnectionInterval = 10 # ... try it every 10 seconds. Example (1 + 5 tries X 10 seconds = 60 seconds until server should be up)
 
     """
     constructor: create an instance by passing ip, password and port as arguments
@@ -47,6 +47,8 @@ class Rcon():
 	self.handlePlayerDisconnect = []
 	# handle chat messages
 	self.handleChat = []
+	# handle abort event fired by connect for instance
+	self.handleAbort = []
 
 	# last timestamp used for checkinh keepalive
 	self.isExit = False
@@ -84,6 +86,8 @@ class Rcon():
 		self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
 	    if "OnChat" in dir(clsObj):
 		self.handleChat.append(clsObj.OnChat)
+	    if "OnAbort" in dir(clsObj):
+		self.handleAbort.append(clsObj.OnAbort)
 	    
 	    self._instances[key] = clsObj
 
@@ -317,11 +321,17 @@ class Rcon():
 	    for conn in self.handleConnect:
 		conn()
 
+    def OnAbort(self):
+	if len(self.handleAbort) > 0:
+	    for abr in self.handleAbort:
+		abr()
+
     """
     public: check if program is about to exit
     """
     def IsAborted(self):
 	return self.isExit
+
 
     """
     public: cancel all loops (keepAlive and others from modules) and send the final "exit" command to disconnect from server
@@ -329,6 +339,7 @@ class Rcon():
     def Abort(self):
 	logging.info("Exit loop")
 	self.isExit = True
+	self.OnAbort()
 	# send the final kill and force socket to call recvfrom (and dont wait for an answer)
 	self.s.settimeout(0.0)
 	self.sendCommand(None)
@@ -354,15 +365,18 @@ class Rcon():
 	    if self.retry < self.ConnectionRetries and not self.isExit:
 		self.retry += 1
 		self.connect()
+	    else:
+		self.Abort()
 
         # Some problem sending data ??
         except socket.error as e:
 	    logging.error('Socket error: {}'.format(e))
+	    self.Abort()
 
         # Ctrl + C
         except (KeyboardInterrupt, SystemExit):
-	    self.Abort()
 	    logging.debug('rconprotocol.connect: Keyboard interrupted')
+	    self.Abort()
 
 	except:
 	    logging.exception("Unhandled Exception")
