@@ -1,4 +1,4 @@
-#!/usr/bin/python -B
+#!/usr/bin/python3 -B
 
 import os, signal, sys, argparse, threading, json, logging
 import lib
