@@ -25,7 +25,7 @@ class Rcon():
     Timeout = 60 # When the connection did not received any response after this period
     KeepAlive = 40 # KeepAlive must always be lower than Timeout, otherwise the Timeout occurs
     ConnectionRetries = 5 # Try to reconnect (at startup) X times and...
-    ConnectionInterval = 10 # ... try it every 10 seconds. Example (6 tries X 10 seconds = 60 seconds until server should be up)
+    ConnectionInterval = 10 # ... try it every 10 seconds. Example (1 + 5 tries X 10 seconds = 60 seconds until server should be up)
 
     """
     constructor: create an instance by passing ip, password and port as arguments
@@ -326,11 +326,17 @@ class Rcon():
             for abr in self.handleAbort:
                 abr()
 
+    def OnAbort(self):
+	if len(self.handleAbort) > 0:
+	    for abr in self.handleAbort:
+		abr()
+
     """
     public: check if program is about to exit
     """
     def IsAborted(self):
         return self.isExit
+
 
 
     """
