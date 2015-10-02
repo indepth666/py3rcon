@@ -1,4 +1,4 @@
-import rconprotocol
+import lib.rconprotocol
 import sched
 import logging
 import time
@@ -17,20 +17,20 @@ class RconRestart(object):
         self.sched = sched.scheduler(time.time, time.sleep)
         self.shutdownTimer = 0
         self.restartMessages = None
-	self.exitOnRestart = False
+        self.exitOnRestart = False
 
-	self.canceled = False	
+        self.canceled = False
 
-	self.rcon = rcon
+        self.rcon = rcon
 
-	logging.debug('%s() initialized' % type(self).__name__)
+        logging.debug('%s() initialized' % type(self).__name__)
 
     """
     Set an interval when the server should receive the shutdown command
     @param integer min - no of minutes until server shutdown
     """
     def setInterval(self, min):
-	self.shutdownTimer = min * 60
+        self.shutdownTimer = min * 60
 
     """
     set a list messages as (multidimensional array) to inform players when the server restart
@@ -43,16 +43,16 @@ class RconRestart(object):
 	]
     """
     def setMessages(self, messageList):
-	self.restartMessages = []
-    	for m in messageList:
-	    self.restartMessages.append( RestartMessage(m[0],m[1]) )
+        self.restartMessages = []
+        for m in messageList:
+            self.restartMessages.append( RestartMessage(m[0],m[1]) )
 
     """
     Exit this application (by using Rcon.Abort()) when the restart occured
     @param bool yesNo - true = exit the program when shutdown command has been sent, otherwise not
     """
     def setExitOnRestart(self, yesNo):
-	self.exitOnRestart = yesNo
+        self.exitOnRestart = yesNo
 
 
     """
@@ -60,15 +60,15 @@ class RconRestart(object):
     When connection is established start the "restart" schedule
     """
     def OnConnected(self):
-	if self.shutdownTimer > 0:
-	    # a separate thread to handle the restart and restart messages
-    	    # It is set as daemon to be able to stop it using SystemExit or Ctrl + C
-	    t = threading.Thread(target=self._initRestartScheduler)
-	    t.daemon = True
-	    t.start()
-	    logging.info('OnConnect(): %s ready to restart server every %d seconds' % (type(self).__name__, self.shutdownTimer))
-	else:
-	    logging.info("OnConnect(): %s disabled" % type(self).__name__)
+        if self.shutdownTimer > 0:
+            # a separate thread to handle the restart and restart messages
+            # It is set as daemon to be able to stop it using SystemExit or Ctrl + C
+            t = threading.Thread(target=self._initRestartScheduler)
+            t.daemon = True
+            t.start()
+            logging.info('OnConnect(): %s ready to restart server every %d seconds' % (type(self).__name__, self.shutdownTimer))
+        else:
+            logging.info("OnConnect(): %s disabled" % type(self).__name__)
 
     """
     private: restart message to warn the players
@@ -103,12 +103,12 @@ class RconRestart(object):
     public: call to cancel the shutdown process
     """
     def cancelRestart(self):
-	self.canceled = True
-	self._emptyScheduler()
-	self.rcon.sendCommand("say -1 \"RESTART CANCELED\"")
+        self.canceled = True
+        self._emptyScheduler()
+        self.rcon.sendCommand("say -1 \"RESTART CANCELED\"")
 
-	# Cancel the current shutdown timer, BUT continue with regular restarts
-	self.OnConnected()
+        # Cancel the current shutdown timer, BUT continue with regular restarts
+        self.OnConnected()
 
     """
     private: initialize the scheduler for restart messages and the shutdown itself
@@ -128,7 +128,7 @@ class RconRestart(object):
         if self.exitOnRestart and not self.canceled:
             self.rcon.Abort()
 
-	self.canceled = False
+        self.canceled = False
 
 
 """
