@@ -32,7 +32,7 @@ GUI
 ========================
 Use the following command to display the GUI.
 
-PLEASE NOTE: When using the --gui argument, schedules like messages are restart interval are disabled
+PLEASE NOTE: When using the --gui argument, schedules like **reapeating messages and **restart intervals are disabled**
 
 <pre>Usage: ./py3rcon.py --gui &lt;configfile&gt;</pre>
 
