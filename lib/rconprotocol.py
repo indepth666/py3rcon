@@ -44,6 +44,7 @@ class Rcon():
         self.handleConnect = []
         # player connect and disconnect handler
         self.handlePlayerConnect = []
+        self.handlePlayers = []
         self.handlePlayerDisconnect = []
         # handle chat messages
         self.handleChat = []
@@ -55,6 +56,18 @@ class Rcon():
         self.isAuthenticated = False
         self.retry = 0
         self.lastcmd = ""
+
+        # server message receive filters
+        self.receiveFilter = (
+            # receive all players
+            ("\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
+            # when player is connected
+            ("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", self.__playerConnect, False),
+            # when player is disconnected
+            ("Player #([0-9]+) (.*?) disconnected", self.__playerDisconnect, False),
+            # chat messages
+            ("\(([A-Za-z]+)\) (.*?): (.*)", self.__chatMessage, False)
+        )
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -84,6 +97,8 @@ class Rcon():
                 self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
             if "OnPlayerDisconnect" in dir(clsObj):
                 self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
+            if "OnPlayers" in dir(clsObj):
+                self.handlePlayers.append(clsObj.OnPlayers)
             if "OnChat" in dir(clsObj):
                 self.handleChat.append(clsObj.OnChat)
             if "OnAbort" in dir(clsObj):
@@ -243,21 +258,38 @@ class Rcon():
             logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
 
+    def __players(self, pl):
+        l = []
+        for m in pl:
+            l.append( Player(m[0], m[3], m[4]) )
+
+        self.OnPlayers(l)
+
+    def __playerConnect(self, m):
+        self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
+
+    def __playerDisconnect(self, m):
+        self.OnPlayerDisconnect( Player(m.group(1), "", m.group(2)) )
+
+    def __chatMessage(self, m):
+        self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
+
     """
     private: parse the incoming message from _streamReader to provide eventing
     """
     def _parseResponse(self, msg):
-        m = re.match("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", msg)
-        if m:
-            self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
-        else:
-            m = re.match("Player #([0-9]+) (.*?) disconnected", msg)
-            if m:
-                self.OnPlayerDisconnect( Player(m.group(1), "", m.group(2)) )
+        for regex, action, multiline in self.receiveFilter:
+            if multiline:
+                m = re.findall(regex, msg)
+                if len(m) > 0:
+                    action(m)
+                    break
             else:
-                m = re.match("\(([A-Za-z]+)\) (.*?): (.*)", msg)
+                m = re.search(regex, msg)
                 if m:
-                    self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
+                    action(m.group())
+                break
+
 
     """
     public: send a chat message to everyone
@@ -281,6 +313,12 @@ class Rcon():
     def lockServer(self):
         self.sendCommand('#lock')
         time.sleep(1)
+
+
+    def OnPlayers(self, playerList):
+        if len(self.handlePlayers) > 0:
+            for pl in self.handlePlayers:
+                pl(playerList)
 
     """
     Event: when a player connects to the server
@@ -336,8 +374,6 @@ class Rcon():
     """
     def IsAborted(self):
         return self.isExit
-
-
 
     """
     public: cancel all loops (keepAlive and others from modules) and send the final "exit" command to disconnect from server

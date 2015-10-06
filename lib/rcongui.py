@@ -10,6 +10,9 @@ import time
 class RconGUI(object):
     def __init__(self, rcon):
         self.rcon = rcon
+        self.logFile = None
+        self.logThread = None
+
         self.mainmenu = [
             ('Send Hello', self.sayHello),
             ('Kick All', self.rcon.kickAll),
@@ -26,8 +29,6 @@ class RconGUI(object):
         # player cursor position
         self.playerpos = 0
         self.players = []
-
-        self.fetchPlayers()
 
         self.posAndSize = {
             # height, width, ypos, xpos
@@ -53,15 +54,23 @@ class RconGUI(object):
 
                 self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
-                self.logThread = threading.Thread(target=self.updateLog)
-                self.logThread.daemon = True
-                self.logThread.start()
             else:
                 curses.endwin()
 
         except:
             curses.endwin()
             raise
+
+    def setLogfile(self, filename):
+        self.logFile = filename
+        if not self.logThread:
+            self.logThread = threading.Thread(target=self.updateLog)
+            self.logThread.daemon = True
+            self.logThread.start()
+
+
+    def OnPlayers(self, playerList):
+        self.players = playerList
 
     def OnAbort(self):
 	    logging.debug("Quit GUI")
@@ -73,6 +82,9 @@ class RconGUI(object):
     def kickPlayer(self):
         logging.debug("Kicking player")
 
+    def fetchPlayers(self):
+        self.rcon.sendCommand('players')
+
     def sayHello(self):
         self.rcon.sendChat("Hello World!")
 
@@ -82,15 +94,14 @@ class RconGUI(object):
         self.titleWnd.addstr(1, 80, "Command executed", curses.A_REVERSE)
         self.cmdWnd.clear()
 
-    def fetchPlayers(self):
-        for i in range(0,95):
-            self.players.append( "Player %d" % i )
-
     def OnConnected(self):
         try:
             t = threading.Thread(target=self._menuThread)
             t.daemon = True
             t.start()
+
+            time.sleep(3)
+            self.fetchPlayers()
         except:
             logging.error(sys.exc_info())
 
@@ -139,8 +150,8 @@ class RconGUI(object):
         logging.debug("Switching to %s Position %d" % (self.__navigation, self.position))
 
     def getPlayerMenu(self):
-        playername = self.players[self.playerpos]
-        self.playermenu = [("Kick %s" % playername, self.kickPlayer) ] + self.backMenu
+        playerObj = self.players[self.playerpos]
+        self.playermenu = [("Kick %s" % playerObj.name, self.kickPlayer) ] + self.backMenu
         return self.playermenu
 
     def navigate(self, n):
@@ -168,13 +179,13 @@ class RconGUI(object):
         if self.rcon.IsAborted():
             return
 
-        #self.logWnd.clear()
+        self.logWnd.clear()
         self.logWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
 
         maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 1
         maxH = self.posAndSize['log'][0] - 1
 
-        lastlines = os.popen("tail -n %d %s" % (maxH,'pyrcon.test.log')).read()
+        lastlines = os.popen("tail -n %d %s" % (maxH, self.logFile)).read()
         lines = lastlines.splitlines()
 
         i = 1
@@ -223,7 +234,7 @@ class RconGUI(object):
 
             if index == self.playerpos and self.__navigation == 'player':
                 _m = curses.A_REVERSE
-            self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player, index), _m)
+            self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player.name, index), _m)
             _row += 1
         self.playerWnd.refresh()
 

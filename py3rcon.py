@@ -83,6 +83,7 @@ if not(GUI) and 'commands' in config:
 
 if GUI:
     modGUI = rcon.loadmodule('rcongui', 'RconGUI')
+    modGUI.setLogfile( config['logfile'] )
 
 ##
 # Connect to server
