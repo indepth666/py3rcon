@@ -10,13 +10,12 @@ How to use?
 
 Configuration example can be found in configexample.json.
 
-<pre>Usage: ./pyrcon.py &lt;configfile&gt;</pre>
+<pre>Usage: ./py3rcon.py &lt;configfile&gt;</pre>
 
 Configuration explained
 =======================
 
-Please note the configuration is stored JSON file.
-This format usually does not allow comments.
+PLEASE NOTE: The configuration is stored JSON file. This format usually does not allow comments.
 
 Config entry            | Example       | Description
 ----------------------- | ------------- | -----------
@@ -29,3 +28,12 @@ commands                | commands.json | Commands configuration file in JSON fo
 restart : interval      | 240           | Restart interval in minutes
 restart : exitonrestart | true          | End the application when restart interval has reached
 
+GUI
+========================
+Use the following command to display the GUI.
+
+PLEASE NOTE: When using the --gui argument, schedules like **reapeating messages and **restart intervals are disabled**
+
+<pre>Usage: ./py3rcon.py --gui &lt;configfile&gt;</pre>
+
+![alt tag](../../raw/gh-pages/images/py3rcon-gui-noplayers.png)
