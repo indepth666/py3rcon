@@ -29,3 +29,6 @@ commands                | commands.json | Commands configuration file in JSON fo
 restart : interval      | 240           | Restart interval in minutes
 restart : exitonrestart | true          | End the application when restart interval has reached
 
+GUI
+========================
+![alt tag](../../raw/gh-pages/images/py3rcon-gui-noplayers.png)
