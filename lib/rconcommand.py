@@ -36,11 +36,11 @@ class RconCommand(object):
     def loadConfig(self):
         if self.configFile is None:
             logging.error('%s: No command config specified' % (type(self).__name__))
-        return False
+            return False
 
         if not os.path.isfile(self.configFile):
             logging.error('%s: Command list file "%s" not found' % (type(self).__name__, self.configFile))
-        return False
+            return False
 
         with open(self.configFile) as json_config:
             config = json.load(json_config)
