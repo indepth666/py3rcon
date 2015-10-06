@@ -365,9 +365,9 @@ class Rcon():
                 abr()
 
     def OnAbort(self):
-	if len(self.handleAbort) > 0:
-	    for abr in self.handleAbort:
-		abr()
+        if len(self.handleAbort) > 0:
+            for abr in self.handleAbort:
+                abr()
 
     """
     public: check if program is about to exit
