@@ -73,8 +73,8 @@ class RconGUI(object):
         self.players = playerList
 
     def OnAbort(self):
-	    logging.debug("Quit GUI")
-	    self.exitCurses()
+        logging.debug("Quit GUI")
+        self.exitCurses()
 
     def shutdownServer(self):
         self.rcon.sendCommand('#shutdown')
