@@ -35,12 +35,12 @@ class RconRestart(object):
     """
     set a list messages as (multidimensional array) to inform players when the server restart
     The format of this array is as following:
-	[<minBeforeRestart|integer>, "<Message|string>"],
-	Example:
-	[
-	    [5, "Restart in 5 minutes"],
-	    [10,"Restart in 10 minutes"]
-	]
+        [<minBeforeRestart|integer>, "<Message|string>"],
+        Example:
+        [
+            [5, "Restart in 5 minutes"],
+            [10,"Restart in 10 minutes"]
+        ]
     """
     def setMessages(self, messageList):
         self.restartMessages = []

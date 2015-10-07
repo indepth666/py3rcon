@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -B
+#!/usr/bin/python -B
 
 import os, signal, sys, argparse, threading, json, logging
 import lib
@@ -83,6 +83,7 @@ if not(GUI) and 'commands' in config:
 
 if GUI:
     modGUI = rcon.loadmodule('rcongui', 'RconGUI')
+    modGUI.setLogfile( config['logfile'] )
 
 ##
 # Connect to server

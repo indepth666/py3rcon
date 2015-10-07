@@ -24,8 +24,8 @@ class Rcon():
 
     Timeout = 60 # When the connection did not received any response after this period
     KeepAlive = 40 # KeepAlive must always be lower than Timeout, otherwise the Timeout occurs
-    ConnectionRetries = 6 # Try to reconnect (at startup) X times and...
-    ConnectionInterval = 10 # ... try it every 10 seconds. Example (6 tries X 10 seconds = 60 seconds until server should be up)
+    ConnectionRetries = 5 # Try to reconnect (at startup) X times and...
+    ConnectionInterval = 10 # ... try it every 10 seconds. Example (1 + 5 tries X 10 seconds = 60 seconds until server should be up)
 
     """
     constructor: create an instance by passing ip, password and port as arguments
@@ -44,15 +44,30 @@ class Rcon():
         self.handleConnect = []
         # player connect and disconnect handler
         self.handlePlayerConnect = []
+        self.handlePlayers = []
         self.handlePlayerDisconnect = []
         # handle chat messages
         self.handleChat = []
+        # handle Abort message
+        self.handleAbort = []
 
         # last timestamp used for checkinh keepalive
         self.isExit = False
         self.isAuthenticated = False
         self.retry = 0
         self.lastcmd = ""
+
+        # server message receive filters
+        self.receiveFilter = (
+            # receive all players
+            ("\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
+            # when player is connected
+            ("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", self.__playerConnect, False),
+            # when player is disconnected
+            ("Player #([0-9]+) (.*?) disconnected", self.__playerDisconnect, False),
+            # chat messages
+            ("\(([A-Za-z]+)\) (.*?): (.*)", self.__chatMessage, False)
+        )
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -82,8 +97,13 @@ class Rcon():
                 self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
             if "OnPlayerDisconnect" in dir(clsObj):
                 self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
+            if "OnPlayers" in dir(clsObj):
+                self.handlePlayers.append(clsObj.OnPlayers)
             if "OnChat" in dir(clsObj):
                 self.handleChat.append(clsObj.OnChat)
+            if "OnAbort" in dir(clsObj):
+                self.handleAbort.append(clsObj.OnAbort)
+
             self._instances[key] = clsObj
 
         return self._instances[key]
@@ -233,27 +253,44 @@ class Rcon():
             else:
                 stream = stream[9:].decode('ascii', 'replace')
                 self._parseResponse(stream)
-	
+
             logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
             logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
+
+    def __players(self, pl):
+        l = []
+        for m in pl:
+            l.append( Player(m[0], m[3], m[4]) )
+
+        self.OnPlayers(l)
+
+    def __playerConnect(self, m):
+        self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
+
+    def __playerDisconnect(self, m):
+        self.OnPlayerDisconnect( Player(m.group(1), "", m.group(2)) )
+
+    def __chatMessage(self, m):
+        self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
 
     """
     private: parse the incoming message from _streamReader to provide eventing
     """
     def _parseResponse(self, msg):
-        m = re.match("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", msg)
-        if m:
-            self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
-        else:
-            m = re.match("Player #([0-9]+) (.*?) disconnected", msg)
-            if m:
-                self.OnPlayerDisconnect( Player(m.group(1), "", m.group(2)) )
+        for regex, action, multiline in self.receiveFilter:
+            if multiline:
+                m = re.findall(regex, msg)
+                if len(m) > 0:
+                    action(m)
+                    break
             else:
-                m = re.match("\(([A-Za-z]+)\) (.*?): (.*)", msg)
+                m = re.search(regex, msg)
                 if m:
-                    self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
-		
+                    action(m.group())
+                break
+
+
     """
     public: send a chat message to everyone
     @param string msg - message text
@@ -276,6 +313,12 @@ class Rcon():
     def lockServer(self):
         self.sendCommand('#lock')
         time.sleep(1)
+
+
+    def OnPlayers(self, playerList):
+        if len(self.handlePlayers) > 0:
+            for pl in self.handlePlayers:
+                pl(playerList)
 
     """
     Event: when a player connects to the server
@@ -304,17 +347,27 @@ class Rcon():
 
     """
     Event: when program is successfully connected and authenticated to the server.
-	   This can perfectly be used in modules.
+           This can perfectly be used in modules.
     """
     def OnConnected(self):
         # initialize keepAlive thread
         _t = threading.Thread(target=self._keepAliveThread)
         _t.deamon = True
         _t.start()
-	
+
         if len(self.handleConnect) > 0:
             for conn in self.handleConnect:
                 conn()
+
+    def OnAbort(self):
+        if len(self.handleAbort) > 0:
+            for abr in self.handleAbort:
+                abr()
+
+    def OnAbort(self):
+        if len(self.handleAbort) > 0:
+            for abr in self.handleAbort:
+                abr()
 
     """
     public: check if program is about to exit
@@ -328,6 +381,7 @@ class Rcon():
     def Abort(self):
         logging.info("Exit loop")
         self.isExit = True
+        self.OnAbort()
         # send the final kill and force socket to call recvfrom (and dont wait for an answer)
         self.s.settimeout(0.0)
         self.sendCommand(None)
@@ -353,15 +407,18 @@ class Rcon():
             if self.retry < self.ConnectionRetries and not self.isExit:
                 self.retry += 1
                 self.connect()
+            else:
+                self.Abort()
 
         # Some problem sending data ??
         except socket.error as e:
             logging.error('Socket error: {}'.format(e))
+            self.Abort()
 
         # Ctrl + C
         except (KeyboardInterrupt, SystemExit):
-            self.Abort()
             logging.debug('rconprotocol.connect: Keyboard interrupted')
+            self.Abort()
 
         except:
             logging.exception("Unhandled Exception")
