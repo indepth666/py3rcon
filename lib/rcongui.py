@@ -2,6 +2,7 @@ import os
 import sys
 import curses
 from curses import panel
+from curses import textpad
 import lib.rconprotocol
 import logging
 import threading
@@ -12,18 +13,27 @@ class RconGUI(object):
         self.rcon = rcon
         self.logFile = None
         self.logThread = None
+        self.cancelCommand = False
 
+        self.navigation = {
+            'menu': self.showMenu,
+            'playermenu': self.showPlayerMenu,
+            'player': self.showPlayers,
+            'command': self.showCommandLine
+        }
         self.mainmenu = [
+            ('Refresh Players', self.fetchPlayers),
             ('Send Hello', self.sayHello),
             ('Kick All', self.rcon.kickAll),
             ('Shutdown (immediately)', self.shutdownServer),
             ('Exit','exit')
         ]
 
-        self.backMenu = [('Main Menu', self.switchNavigation)]
         self.playermenu = []
+        self.backMenu = [('Main Menu', self.getMainMenu)]
 
-        self.__navigation = 'menu'
+        self.__navigation = self.getMainMenu()
+        self.__prevnav = None
         # menu cursor position
         self.position = 0
         # player cursor position
@@ -33,24 +43,27 @@ class RconGUI(object):
         self.posAndSize = {
             # height, width, ypos, xpos
             'menu':     [27, 30, 1, 1],
-            'log':      [8, 131, 33, 1],
-            'cmdlabel': [3, 131, 28, 1],
-            'cmd':      [3, 131, 30, 1],
+            'log':      [8, 131, 31, 1],
+            'cmd':      [3, 131, 28, 1],
+            'cmdTextbox':[1, 120, 29, 3],
             'player':   [27, 100, 1, 32]
         }
 
-        self.cmdText = ""
-
         try:
             self.screen = curses.initscr()
+            self.initColors()
+            curses.cbreak()
+            curses.noecho()
+            curses.curs_set(0)
+
             if self.checkMaxSize():
                 self.menuWnd = self.screen.subwin(*self.posAndSize['menu'])
                 self.menuWnd.keypad(1)
 
                 self.logWnd = self.screen.subwin(*self.posAndSize['log'])
 
-                self.titleWnd = self.screen.subwin(*self.posAndSize['cmdlabel'])
                 self.cmdWnd = self.screen.subwin(*self.posAndSize['cmd'])
+                self.cmdTextbox = self.screen.subwin(*self.posAndSize['cmdTextbox'])
 
                 self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
@@ -61,6 +74,10 @@ class RconGUI(object):
             curses.endwin()
             raise
 
+
+    def getMainMenu(self):
+        return 'menu'
+
     def setLogfile(self, filename):
         self.logFile = filename
         if not self.logThread:
@@ -68,19 +85,31 @@ class RconGUI(object):
             self.logThread.daemon = True
             self.logThread.start()
 
+    def initColors(self):
+        curses.start_color()
+        # pair one is used for menu selection
+        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+        # pair for command line
+        curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
 
     def OnPlayers(self, playerList):
         self.players = playerList
+        self.switchNavigation('player')
+        
 
     def OnAbort(self):
-	    logging.debug("Quit GUI")
-	    self.exitCurses()
+        logging.debug("Quit GUI")
+        self.exitCurses()
 
     def shutdownServer(self):
         self.rcon.sendCommand('#shutdown')
 
     def kickPlayer(self):
-        logging.debug("Kicking player")
+        playerObj = self.players[self.playerpos]
+        logging.debug("Kicking player '%s'" % playerObj.name)
+
+        self.rcon.sendCommand('kick %s' % playerObj.number)
+        return self.getMainMenu()
 
     def fetchPlayers(self):
         self.rcon.sendCommand('players')
@@ -88,19 +117,13 @@ class RconGUI(object):
     def sayHello(self):
         self.rcon.sendChat("Hello World!")
 
-    def callCommand(self):
-        self.rcon.sendCommand(self.cmdText)
-        self.cmdText = ""
-        self.titleWnd.addstr(1, 80, "Command executed", curses.A_REVERSE)
-        self.cmdWnd.clear()
-
     def OnConnected(self):
         try:
             t = threading.Thread(target=self._menuThread)
             t.daemon = True
             t.start()
 
-            time.sleep(3)
+            time.sleep(2)
             self.fetchPlayers()
         except:
             logging.error(sys.exc_info())
@@ -137,33 +160,35 @@ class RconGUI(object):
     """
     Switch between player and menu navigation
     """
-    def switchNavigation(self, toNav = 'menu'):
-        self.position = 0
-        self.__navigation = toNav
+    def switchNavigation(self):
+        if not (self.__prevnav is None) and self.__prevnav != self.__navigation:
+            self.navigation[self.__prevnav]()
 
+        self.navigation[self.__navigation]()
+        self.__prevnav = self.__navigation
+
+        res = ''
         # clean up the menu window because other menus might have less info than the other
         if self.__navigation == 'menu' or self.__navigation == 'playermenu':
-            self.menuWnd.clear()
+            res = self.inputMenu()
         elif self.__navigation == 'player':
-            self.playerWnd.clear()
+            res = self.inputMenu()
+        elif self.__navigation == 'command':
+            res = self.inputCommand()
 
-        logging.debug("Switching to %s Position %d" % (self.__navigation, self.position))
-
-    def getPlayerMenu(self):
-        playerObj = self.players[self.playerpos]
-        self.playermenu = [("Kick %s" % playerObj.name, self.kickPlayer) ] + self.backMenu
-        return self.playermenu
+        self.__navigation = res
 
     def navigate(self, n):
         if self.__navigation == 'menu' or self.__navigation == 'playermenu':
-            _items = self.mainmenu
+            _length = len(self.mainmenu)
             if self.__navigation == 'playermenu':
-                _items = self.playermenu
-            self.position += n
-            if self.position < 0:
+                _length = len(self.playermenu)
+            if (self.position + n) < 0:
                 self.position = 0
-            elif self.position >= len(_items):
-                self.position = len(_items) - 1
+            elif (self.position + n) >= _length:
+                self.position = _length - 1
+            else:
+                self.position += n
         elif self.__navigation == 'player':
             if (self.playerpos + n) < 0:
                 self.playerpos = 0
@@ -171,7 +196,6 @@ class RconGUI(object):
                 self.playerpos = len(self.players) - 1
             else:
                 self.playerpos += n
-
 
     def updateLog(self):
         time.sleep(2)
@@ -206,20 +230,39 @@ class RconGUI(object):
         self.logWnd.refresh()
         self.updateLog()
 
-    def updateMenu(self, items):
+    def showMenu(self):
         self.menuWnd.clear()
         self.menuWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
 
-        for index, item in enumerate(items):
+        for index, item in enumerate(self.mainmenu):
             mode = curses.A_NORMAL
-            if index == self.position and (self.__navigation == 'menu' or self.__navigation == 'playermenu'):
-                mode = curses.A_REVERSE
+            if index == self.position and self.__navigation == 'menu':
+                mode = curses.color_pair(1)
             msg = ' %s' % item[0]
             self.menuWnd.addstr(1+index, 1, msg, mode)
 
         self.menuWnd.refresh()
 
-    def updatePlayer(self):
+    def showPlayerMenu(self):
+        self.menuWnd.clear()
+        self.menuWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
+
+        self.playermenu = list(self.backMenu)
+
+        if len(self.players) > 0:
+            playerObj = self.players[self.playerpos]
+            self.playermenu.append( ('Kick %s' % playerObj.name, self.kickPlayer) )
+
+        for index, item in enumerate(self.playermenu):
+            mode = curses.A_NORMAL
+            if index == self.position and self.__navigation == 'playermenu':
+                mode = curses.color_pair(1)
+            msg = ' %s' % item[0]
+            self.menuWnd.addstr(1+index, 1, msg, mode)
+
+        self.menuWnd.refresh()
+
+    def showPlayers(self):
         self.playerWnd.clear()
         self.playerWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
         _row = 0
@@ -233,65 +276,86 @@ class RconGUI(object):
             _m = curses.A_NORMAL
 
             if index == self.playerpos and self.__navigation == 'player':
-                _m = curses.A_REVERSE
+                _m = curses.color_pair(1)
             self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player.name, index), _m)
             _row += 1
         self.playerWnd.refresh()
 
-    def updateCommandLine(self):
-        self.titleWnd.addstr(1, 2, "Type any valid server command below", curses.A_NORMAL)
+    def showCommandLine(self):
+        self.cmdWnd.clear()
         self.cmdWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
-        self.cmdWnd.addstr(1, 2, self.cmdText, curses.A_REVERSE)
+        
+        _color = curses.A_NORMAL
+        if self.__navigation == 'command':
+            _color = curses.color_pair(1)
+
+        self.cmdWnd.addstr(0, 2, "  Enter command ", _color)
         self.cmdWnd.refresh()
-        self.titleWnd.refresh()
+        
+    def cmdValidate(self, ch):
+        if ch == 9:
+            self.cancelCommand = True
+            ch = curses.ascii.BEL
+        return ch
+
+    def inputCommand(self):
+        self.cmdTextbox.move(0,0)
+
+        tb = textpad.Textbox(self.cmdTextbox)
+        text = tb.edit(self.cmdValidate)
+
+        if not self.cancelCommand:
+            self.rcon.sendCommand(text.strip())
+
+        self.cancelCommand = False
+
+        return self.getMainMenu()
+
+    def inputMenu(self):
+        _result = self.__navigation
+
+        key = self.menuWnd.getch()
+
+        if key in [curses.KEY_ENTER, ord('\n')]:
+            time.sleep(0.5)
+            if self.__navigation == 'menu':
+                if self.position == len(self.mainmenu)-1:
+                    _result = ''
+                    return
+                else:
+                    self.mainmenu[self.position][1]()
+            elif self.__navigation == 'playermenu':
+                _result = self.playermenu[self.position][1]()
+            elif self.__navigation == 'player':
+                self.position = 0
+                _result = 'playermenu'
+        elif key == curses.KEY_UP:
+            self.navigate( -1 )
+        elif key == curses.KEY_DOWN:
+            self.navigate(1)
+        elif key == curses.KEY_RIGHT:
+            self.navigate(25)
+        elif key == curses.KEY_LEFT:
+            self.navigate(-25)
+
+        elif key == 9:
+            if self.__navigation == 'menu':
+                _result = 'player'
+            elif self.__navigation == 'player':
+                _result = 'command'
+            else:
+                _result = self.getMainMenu()
+
+        return _result
 
     def display(self):
         try:
-            while True:
-                curses.curs_set(0)
-                self.updateCommandLine()
-                self.updatePlayer()
+            for k, v in self.navigation.iteritems():
+                if k != self.__navigation:
+                    v()
 
-                if self.__navigation == 'playermenu':
-                    self.updateMenu( self.getPlayerMenu() )
-                else:
-                    self.updateMenu(self.mainmenu)
-
-                key = self.menuWnd.getch()
-
-                if key in [curses.KEY_ENTER, ord('\n')]:
-                    if len(self.cmdText) > 0:
-                        self.callCommand()
-                    elif self.__navigation == 'menu':
-                        if self.position == len(self.mainmenu)-1:
-                            break
-                        else:
-                            self.mainmenu[self.position][1]()
-                    elif self.__navigation == 'playermenu':
-                        self.playermenu[self.position][1]()
-                    elif self.__navigation == 'player':
-                        self.switchNavigation('playermenu')
-                        self.position = 0
-
-                elif key == curses.KEY_UP:
-                    self.navigate( -1 )
-                elif key == curses.KEY_DOWN:
-                    self.navigate(1)
-                elif key == curses.KEY_RIGHT:
-                    self.navigate(25)
-                elif key == curses.KEY_LEFT:
-                    self.navigate(-25)
-                elif key == 9:
-                    if self.__navigation == 'menu':
-                        self.switchNavigation('player')
-                    else:
-                        self.switchNavigation('menu')
-                elif key > 32 and key < 126:
-                    self.position = -1
-                    self.cmdText += chr(key)
-                elif key == curses.KEY_BACKSPACE:
-                    self.cmdText = self.cmdText[:-1]
-                    self.cmdWnd.clear()
+            while self.__navigation:
+                self.switchNavigation()
 
         except (KeyboardInterrupt, SystemExit):
             logging.error(sys.exc_info())

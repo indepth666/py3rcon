@@ -266,13 +266,13 @@ class Rcon():
         self.OnPlayers(l)
 
     def __playerConnect(self, m):
-        self.OnPlayerConnect( Player(m.group(2), m.group(1), m.group(3)) )
+        self.OnPlayerConnect( Player(m[2], m[1], m[3]) )
 
     def __playerDisconnect(self, m):
-        self.OnPlayerDisconnect( Player(m.group(1), "", m.group(2)) )
+        self.OnPlayerDisconnect( Player(m[1], "", m[2]) )
 
     def __chatMessage(self, m):
-        self.OnChat( ChatMessage( m.group(1), m.group(2), m.group(3)) )
+        self.OnChat( ChatMessage( m[1], m[2], m[3]) )
 
     """
     private: parse the incoming message from _streamReader to provide eventing
