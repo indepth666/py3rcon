@@ -1,13 +1,4 @@
 main.py
-pyrcon.test.log
-.idea/.name
-.idea/encodings.xml
-.idea/misc.xml
-.idea/modules.xml
-.idea/python3rcon.iml
-.idea/scopes/scope_settings.xml
-.idea/vcs.xml
-.idea/workspace.xml
-__pycache__/rconprotocol.cpython-33.pyc
-__pycache__/rconprotocol.cpython-32.pyc
-__pycache__/messenger.cpython-33.pyc
+config.json
+pyrcon.*.log
+**/*.pyc
