@@ -52,29 +52,28 @@ class RconGUI(object):
         try:
             self.screen = curses.initscr()
             self.initColors()
+
             curses.cbreak()
             curses.noecho()
             curses.curs_set(0)
 
-            if self.checkMaxSize():
-                self.menuWnd = self.screen.subwin(*self.posAndSize['menu'])
-                self.menuWnd.keypad(1)
+            if not self.checkMaxSize():
+                raise Exception('THE TERMINAL WINDOW IS TO SMALL (width/height)')
+            
+            self.menuWnd = self.screen.subwin(*self.posAndSize['menu'])
+            self.menuWnd.keypad(1)
 
-                self.logWnd = self.screen.subwin(*self.posAndSize['log'])
+            self.logWnd = self.screen.subwin(*self.posAndSize['log'])
 
-                self.cmdWnd = self.screen.subwin(*self.posAndSize['cmd'])
-                self.cmdTextbox = self.screen.subwin(*self.posAndSize['cmdTextbox'])
+            self.cmdWnd = self.screen.subwin(*self.posAndSize['cmd'])
+            self.cmdTextbox = self.screen.subwin(*self.posAndSize['cmdTextbox'])
 
-                self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
+            self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
-            else:
-                curses.endwin()
-
-        except:
-            print "Exception in RconGUI: ", sys.exc_info()[0]
-            curses.endwin()
+        except Exception, e:
+            self.exitCurses()
+            print "\nRconGUI Exception:", str(e)
             raise
-
 
     def getMainMenu(self):
         return 'menu'
@@ -97,7 +96,6 @@ class RconGUI(object):
         self.players = playerList
         self.switchNavigation('player')
         
-
     def OnAbort(self):
         logging.debug("Quit GUI")
         self.exitCurses()
@@ -148,15 +146,11 @@ class RconGUI(object):
 
         overlap = list(filter(lambda v: v[0] + v[2] > my, self.posAndSize.values()))
         if len(overlap) > 0:
-            curses.endwin()
             _res = False
-            print('--- TERMINAL WINDOW HEIGHT TOO SMALL ---')
 
         overlap = list(filter(lambda v: v[1] + v[3] > mx, self.posAndSize.values()))
         if len(overlap) > 0:
-            curses.endwin()
             _res = False
-            print('--- TERMINAL WINDOW WEIGHT TOO SMALL ---')
 
         return _res
 
@@ -199,7 +193,10 @@ class RconGUI(object):
                 self.playerpos = len(self.players) - 1
             else:
                 self.playerpos += n
-
+    
+    """
+    Thread to update the log file using N last lines (calculated)
+    """
     def updateLog(self):
         time.sleep(2)
 
@@ -236,6 +233,9 @@ class RconGUI(object):
         self.logWnd.refresh()
         self.updateLog()
 
+    """
+    Display the main menu
+    """
     def showMenu(self):
         self.menuWnd.clear()
         self.menuWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
@@ -249,6 +249,9 @@ class RconGUI(object):
 
         self.menuWnd.refresh()
 
+    """
+    Display the player menu, when player is selected
+    """
     def showPlayerMenu(self):
         self.menuWnd.clear()
         self.menuWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
@@ -268,6 +271,9 @@ class RconGUI(object):
 
         self.menuWnd.refresh()
 
+    """
+    Display the list of all players available on the server
+    """
     def showPlayers(self):
         self.playerWnd.clear()
         self.playerWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
@@ -287,6 +293,9 @@ class RconGUI(object):
             _row += 1
         self.playerWnd.refresh()
 
+    """
+    Display the command bar
+    """
     def showCommandLine(self):
         self.cmdWnd.clear()
         self.cmdWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
@@ -304,6 +313,9 @@ class RconGUI(object):
             ch = curses.ascii.BEL
         return ch
 
+    """
+    Command input when focused
+    """
     def inputCommand(self):
         self.cmdTextbox.move(0,0)
 
@@ -317,6 +329,9 @@ class RconGUI(object):
 
         return self.getMainMenu()
 
+    """
+    Keyboard input for the menu, when focused
+    """
     def inputMenu(self):
         _result = self.__navigation
 
