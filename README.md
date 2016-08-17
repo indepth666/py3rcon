@@ -12,6 +12,10 @@ Configuration example can be found in configexample.json.
 
 <pre>Usage: ./py3rcon.py &lt;configfile&gt;</pre>
 
+**PLEASE NOTE:**<br />
+Since version 1.58.1* of Arma 3 it is REQUIRED to add the line `RConPort <port>` into the beserver.cfg<br />
+Otherwise Rcon will possible not work.
+
 Configuration explained
 =======================
 
