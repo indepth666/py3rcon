@@ -71,6 +71,7 @@ class RconGUI(object):
                 curses.endwin()
 
         except:
+            print "Exception in RconGUI: ", sys.exc_info()[0]
             curses.endwin()
             raise
 
@@ -147,11 +148,13 @@ class RconGUI(object):
 
         overlap = list(filter(lambda v: v[0] + v[2] > my, self.posAndSize.values()))
         if len(overlap) > 0:
+            curses.endwin()
             _res = False
             print('--- TERMINAL WINDOW HEIGHT TOO SMALL ---')
 
         overlap = list(filter(lambda v: v[1] + v[3] > mx, self.posAndSize.values()))
         if len(overlap) > 0:
+            curses.endwin()
             _res = False
             print('--- TERMINAL WINDOW WEIGHT TOO SMALL ---')
 
@@ -201,6 +204,9 @@ class RconGUI(object):
         time.sleep(2)
 
         if self.rcon.IsAborted():
+            return
+
+        if not hasattr(self, 'logWnd'):
             return
 
         self.logWnd.clear()
