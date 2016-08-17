@@ -221,8 +221,6 @@ class Rcon():
         p = packet[0]
         try:
             if p[0:2] == b'BE':
-
-                #print(p[8:9])
                 self.s.sendto(self._acknowledge(p[8:9]), (self.ip, self.port))
         except:
             pass
@@ -257,7 +255,6 @@ class Rcon():
             logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
             logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
-
     def __players(self, pl):
         l = []
         for m in pl:
@@ -289,7 +286,6 @@ class Rcon():
                 if m:
                     action(m.group())
                 break
-
 
     """
     public: send a chat message to everyone
