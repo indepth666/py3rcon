@@ -12,6 +12,10 @@ Configuration example can be found in configexample.json.
 
 <pre>Usage: ./py3rcon.py &lt;configfile&gt;</pre>
 
+**PLEASE NOTE:**<br />
+Since version 1.58.1* of Arma 3 it is REQUIRED to add the line `RConPort <port>` into the beserver.cfg<br />
+Otherwise Rcon will possible not work.
+
 Configuration explained
 =======================
 
@@ -32,7 +36,8 @@ GUI
 ========================
 Use the following command to display the GUI.
 
-PLEASE NOTE: When using the --gui argument, schedules like **reapeating messages and **restart intervals are disabled**
+**PLEASE NOTE:**<br /> 
+When using the `--gui` argument, schedules like **repeating messages** and **restart** become disabled
 
 <pre>Usage: ./py3rcon.py --gui &lt;configfile&gt;</pre>
 

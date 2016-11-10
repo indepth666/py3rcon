@@ -25,14 +25,12 @@ class RconCommand(object):
     public: Set the destinaiton path of the commands configuration file
     @param string configFile - absolute path of the configuration file
     """
-
     def setConfig(self, configFile):
         self.configFile = configFile
 
     """
     public: (Re)Load the commands configuration file
     """
-
     def loadConfig(self):
         if self.configFile is None:
             logging.error('%s: No command config specified' % (type(self).__name__))
@@ -67,9 +65,9 @@ class RconCommand(object):
                 self.cmdList.append( RconCommandItem( c[0], c[1] ) )
 
     """
-            Event: Called by Rcon.OnConnected()
-            Used to load the configuration being set by setConfig(<file>)
-            """
+    Event: Called by Rcon.OnConnected()
+    Used to load the configuration being set by setConfig(<file>)
+    """
     def OnConnected(self):
         if self.loadConfig():
             logging.info('OnConnect(): %s configured (%d commands %d admins)' % (type(self).__name__, len(self.cmdList), len(self.adminList)))
@@ -77,9 +75,9 @@ class RconCommand(object):
             logging.info('OnConnect(): %s disabled' % type(self).__name__)
 
     """
-            Event: Called by Rcon.OnPlayerConnect(Player)
-            Used manage adminstrator when they login (plus a info message)
-            """
+    Event: Called by Rcon.OnPlayerConnect(Player)
+    Used manage adminstrator when they login (plus a info message)
+    """
     def OnPlayerConnect(self, player):
         # do some action when player connects
         logging.debug('OnPlayerConnect(): %s - Player: %s' % ( type(self).__name__, player.name))
@@ -89,6 +87,10 @@ class RconCommand(object):
 
         self.players.append(player)
 
+    """
+    Event: Called by Rcon.OnPlayerDisconnect(Player)
+    Used to do some action when a player disconnected   
+    """
     def OnPlayerDisconnect(self, player):
         # do some action when player disconnects
         logging.debug('OnPlayerDisconnect(): %s - Player: %s' % (type(self).__name__, player.name))
@@ -98,9 +100,9 @@ class RconCommand(object):
             self.players.remove(found[0])
 
     """
-            Event: Called by Rcon.OnChat(ChatMessage)
-            Used to validate and Execute the admin commands
-            """
+    Event: Called by Rcon.OnChat(ChatMessage)
+    Used to validate and Execute the admin commands
+    """
     def OnChat(self, obj):
         # do some action when player sends a chat message
         logging.info("RconCommand: %s - %s" % (obj.channel, obj.message))

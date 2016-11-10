@@ -20,7 +20,6 @@ class RconRestart(object):
         self.exitOnRestart = False
 
         self.canceled = False
-
         self.rcon = rcon
 
         logging.debug('%s() initialized' % type(self).__name__)
@@ -53,7 +52,6 @@ class RconRestart(object):
     """
     def setExitOnRestart(self, yesNo):
         self.exitOnRestart = yesNo
-
 
     """
     Event: Called from Rcon.OnConnected()
