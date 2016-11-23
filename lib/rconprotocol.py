@@ -263,13 +263,13 @@ class Rcon():
         self.OnPlayers(l)
 
     def __playerConnect(self, m):
-        self.OnPlayerConnect( Player(m[2], m[1], m[3]) )
+        self.OnPlayerConnect( Player(m[1], m[0], m[2]) )
 
     def __playerDisconnect(self, m):
-        self.OnPlayerDisconnect( Player(m[1], "", m[2]) )
+        self.OnPlayerDisconnect( Player(m[0], "", m[1]) )
 
     def __chatMessage(self, m):
-        self.OnChat( ChatMessage( m[1], m[2], m[3]) )
+        self.OnChat( ChatMessage( m[0], m[1], m[2]) )
 
     """
     private: parse the incoming message from _streamReader to provide eventing
@@ -284,7 +284,7 @@ class Rcon():
             else:
                 m = re.search(regex, msg)
                 if m:
-                    action(m.group())
+                    action(m.groups())
                 break
 
     """
