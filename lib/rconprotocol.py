@@ -16,6 +16,7 @@ Also it provides some default commands, like kickAll, sendChat , lockServer, etc
 
 The module loader <loadmodule(name, class)> allows the use of the following events:
 - OnConnected
+- OnReconnected
 - OnPlayerConnect
 - OnPlayerDisconnect
 - OnChat
@@ -42,6 +43,7 @@ class Rcon():
 
         # connection handler
         self.handleConnect = []
+        self.handleReconnect = []
         # player connect and disconnect handler
         self.handlePlayerConnect = []
         self.handlePlayers = []
@@ -93,6 +95,8 @@ class Rcon():
 
             if "OnConnected" in dir(clsObj):
                 self.handleConnect.append(clsObj.OnConnected)
+            if "OnReconnected" in dir(clsObj):
+                self.handleReconnect.append(clsObj.OnReconnected)
             if "OnPlayerConnect" in dir(clsObj):
                 self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
             if "OnPlayerDisconnect" in dir(clsObj):
@@ -238,6 +242,8 @@ class Rcon():
                 if not self.isAuthenticated:
                     self.isAuthenticated = True
                     self.OnConnected()
+                else:
+                    self.OnReconnected()
             # when authentication failed, exit the program
             elif stream[6:] == "\xff\x00\x00":
                 logging.error("Not Authenticated")
@@ -249,7 +255,7 @@ class Rcon():
                 stream = "KeepAlive"
             # all other packages and commands
             else:
-                stream = stream[9:].decode('ascii', 'replace')
+                stream = stream[9:].decode('utf-8', 'replace')
                 self._parseResponse(stream)
 
             logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
@@ -354,6 +360,15 @@ class Rcon():
         if len(self.handleConnect) > 0:
             for conn in self.handleConnect:
                 conn()
+
+    """
+    Event: when program is successfully reconnected and authenticated to the server.
+           This can perfectly be used in modules.
+    """
+    def OnReconnected(self):
+        if len(self.handleReconnect) > 0:
+            for reconn in self.handleReconnect:
+                reconn()
 
     def OnAbort(self):
         if len(self.handleAbort) > 0:
