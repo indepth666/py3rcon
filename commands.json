@@ -1,8 +1,8 @@
 {
     "admins": ["d41d8cd98f00b204e9800998ecf8427e", "098f6bcd4621d373cade4e832627b4f6"],
     "commands": [
-	["!kickall","Rcon:kickAll"],
-	["!reload", "rconcommand:RconCommand:loadConfig"],
-	["!cancel", "rconrestart:RconRestart:cancelRestart"]
+        ["!kickall","Rcon:kickAll"],
+        ["!reload", "rconcommand:RconCommand:loadConfig"],
+        ["!cancel", "rconrestart:RconRestart:cancelRestart"]
     ]
 }
