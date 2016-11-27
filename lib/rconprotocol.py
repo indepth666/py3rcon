@@ -1,13 +1,5 @@
-import socket
-import os
-import sys
-import binascii
-import time, datetime
-import threading
-import logging
-import importlib
+import socket, os, sys, binascii, time, datetime, threading, logging, importlib
 import re
-
 
 """
 Rcon protocol class.
@@ -235,7 +227,7 @@ class Rcon():
             stream = packet[0]
 
             # successfully authenticad packet received
-            if stream[6:] == "\xff\x00\x01":
+            if stream[6:] == b'\xff\x00\x01':
                 self.s.settimeout( self.Timeout )
                 stream = "Authenticated"
                 # Only do the below if this is the initial connect call
@@ -245,13 +237,13 @@ class Rcon():
                 else:
                     self.OnReconnected()
             # when authentication failed, exit the program
-            elif stream[6:] == "\xff\x00\x00":
+            elif stream[6:] == b'\xff\x00\x00':
                 logging.error("Not Authenticated")
                 exit()
             # success message from the server for the previous command (or keep alive)
-            elif stream[6:] == "\xff\x01\x00" and self.lastcmd:
+            elif stream[6:] == b'\xff\x01\x00' and self.lastcmd:
                 stream = "ACK {}".format(self.lastcmd)
-            elif stream[6:] == "\xff\x01\x00" and not self.lastcmd:
+            elif stream[6:] == b'\xff\x01\x00' and not self.lastcmd:
                 stream = "KeepAlive"
             # all other packages and commands
             else:

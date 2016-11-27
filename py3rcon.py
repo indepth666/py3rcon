@@ -1,6 +1,6 @@
 #!/usr/bin/python -B
 
-import os, signal, sys, argparse, threading, json, logging
+import os, signal, sys, argparse, threading, json, logging, tempfile
 import lib
 from lib.rconprotocol import Rcon
 
@@ -40,7 +40,9 @@ print('')
 print('Logging to: {}'.format(config['logfile']))
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
-pidfile = '/tmp/py3rcon.{}.run'.format(config['server']['port'])
+pidfile = '{}/py3rcon.{}.run'.format(tempfile.gettempdir(),config['server']['port'])
+
+print("You are running pyrcon on ", os.name)
 
 if not(GUI):
     if os.path.isfile(pidfile):

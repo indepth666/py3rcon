@@ -1,12 +1,6 @@
-import os
-import sys
-import curses
+import os, sys, logging, threading, time, curses
 from curses import panel
 from curses import textpad
-import lib.rconprotocol
-import logging
-import threading
-import time
 
 class RconGUI(object):
     def __init__(self, rcon):
@@ -70,9 +64,9 @@ class RconGUI(object):
 
             self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
-        except Exception, e:
+        except:
             self.exitCurses()
-            print "\nRconGUI Exception:", str(e)
+            print("\nRconGUI Exception:", sys.exc_info()[0])
             raise
 
     def getMainMenu(self):
@@ -209,25 +203,38 @@ class RconGUI(object):
         self.logWnd.clear()
         self.logWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
 
-        maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 1
+        maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 2
         maxH = self.posAndSize['log'][0] - 1
 
-        lastlines = os.popen("tail -n %d %s" % (maxH, self.logFile)).read()
-        lines = lastlines.splitlines()
+        fp = open(self.logFile)
+        fp.seek(0, 2)
+        file_size = fp.tell()
+        
+        offset = file_size - 500
+        if offset < 0:
+            offset = 0
+
+        fp.seek(offset, 0)
+
+        lines = []
+        for chunk in iter(lambda: fp.readline(), ''):
+            lines.append( chunk )
+        
+        lines = lines[maxH * -1:]
 
         i = 1
         while(i < maxH and len(lines)):
             curLine = lines.pop()
             maxH - i
 
-            if len(curLine) > maxW:
-                self.logWnd.addstr(maxH - i, 1, curLine[maxW:])
+            if len(curLine) >= maxW:
+                self.logWnd.addstr(maxH - i, 2, curLine[maxW:].rstrip())
                 i += 1
                 curLine = curLine[:maxW]
                 if i >= maxH:
                     break
 
-            self.logWnd.addstr(maxH - i, 1, curLine)
+            self.logWnd.addstr(maxH - i, 2, curLine.rstrip())
             i += 1
 
         self.logWnd.refresh()
@@ -371,7 +378,7 @@ class RconGUI(object):
 
     def display(self):
         try:
-            for k, v in self.navigation.iteritems():
+            for k, v in self.navigation.items():
                 if k != self.__navigation:
                     v()
 

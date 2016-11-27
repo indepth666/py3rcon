@@ -36,6 +36,9 @@ GUI
 ========================
 Use the following command to display the GUI.
 
+To run the py3rcon GUI on WINDOWS an unofficial version of curses is REQUIRED: 
+Download Link: http://www.lfd.uci.edu/~gohlke/pythonlibs/#curses
+
 **PLEASE NOTE:**<br /> 
 When using the `--gui` argument, schedules like **repeating messages** and **restart** become disabled
 
