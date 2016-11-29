@@ -1,3 +1,4 @@
+.vscode/settings.json
 main.py
 config.json
 pyrcon.*.log
