@@ -16,7 +16,7 @@ The module loader <loadmodule(name, class)> allows the use of the following even
 class Rcon():
 
     Timeout = 60 # When the connection did not received any response after this period
-    KeepAlive = 40 # KeepAlive must always be lower than Timeout, otherwise the Timeout occurs
+    KeepAlive = 30 # KeepAlive must always be lower than Timeout, otherwise the Timeout occurs
     ConnectionRetries = 5 # Try to reconnect (at startup) X times and...
     ConnectionInterval = 10 # ... try it every 10 seconds. Example (1 + 5 tries X 10 seconds = 60 seconds until server should be up)
 
@@ -52,7 +52,7 @@ class Rcon():
         self.lastcmd = ""
 
         # server message receive filters
-        self.receiveFilter = (
+        self.receiveFilter = [
             # receive all players
             ("\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
             # when player is connected
@@ -60,8 +60,8 @@ class Rcon():
             # when player is disconnected
             ("Player #([0-9]+) (.*?) disconnected", self.__playerDisconnect, False),
             # chat messages
-            ("\(([A-Za-z]+)\) (.*?): (.*)", self.__chatMessage, False)
-        )
+            ("\((\w+)\) (.*?): (.*)", self.__chatMessage, False),
+        ]
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -273,7 +273,8 @@ class Rcon():
     private: parse the incoming message from _streamReader to provide eventing
     """
     def _parseResponse(self, msg):
-        for regex, action, multiline in self.receiveFilter:
+        for x in self.receiveFilter:
+            regex, action, multiline = x
             if multiline:
                 m = re.findall(regex, msg)
                 if len(m) > 0:
@@ -283,14 +284,14 @@ class Rcon():
                 m = re.search(regex, msg)
                 if m:
                     action(m.groups())
-                break
+                    break
 
     """
     public: send a chat message to everyone
     @param string msg - message text
     """
-    def sendChat(self, msg):
-        self.sendCommand("say -1 \"%s\"" % msg)
+    def sendChat(self, msg, ident = -1):
+        self.sendCommand("say %s \"%s\"" % (ident,msg))
 
     """
     public: kick all players
@@ -298,7 +299,7 @@ class Rcon():
     def kickAll(self):
         logging.info('Kick All player before restart take action')
         for i in range(1, 100):
-            self.sendCommand('#kick {}'.format(i))
+            self.sendCommand('kick %s' % (i))
             time.sleep(0.1)
 
     """
@@ -389,6 +390,11 @@ class Rcon():
         self.s.settimeout(0.0)
         self.sendCommand(None)
 
+    def connectAsync(self):
+        _t = threading.Thread(target=self.connect)
+        _t.deamon = True
+        _t.start()
+
     """
     public: used to establish the connection to the server giving by constructor call
     """
@@ -436,6 +442,23 @@ class Player():
         self.number = no
         self.guid = guid
         self.name = name
+        self.allowed = False
+
+    def Allow(self):
+        self.allowed = True
+
+    def Disallow(self):
+        self.allowed = False
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+        
+    @staticmethod
+    def fromJSON(i):
+        o = Player(i['number'], i['guid'], i['name'])
+        if i['allowed']:
+            o.Allow()
+        return o
 
 """
 Chat class commonly used for event OnChat

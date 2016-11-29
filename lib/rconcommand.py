@@ -1,10 +1,6 @@
-import os
+import os, logging, threading, time, re, json
+import inspect
 import lib.rconprotocol
-import logging
-import threading
-import time
-import re
-import json
 
 """
 RconCommand class used to read admin commands sent through normal chat messages.
@@ -20,6 +16,10 @@ class RconCommand(object):
         self.rcon = rcon
 
         logging.debug('%s: initialized' % type(self).__name__)
+
+    def showHelp(self, player):
+        logging.info("Show HELP")
+        self.rcon.sendChat("Hi %s - You are py3rcon admin" % (player.name), player.number)
 
     """
     public: Set the destinaiton path of the commands configuration file
@@ -107,12 +107,12 @@ class RconCommand(object):
         # do some action when player sends a chat message
         logging.info("RconCommand: %s - %s" % (obj.channel, obj.message))
         try:
-            found = list(filter(lambda x: x.name == obj.sender, self.players))
-            if (len(found) > 0) and found[0].guid in self.adminList:
+            found = [x for x in self.players if x.name == obj.sender]
+            if len(found) > 0 and found[0].guid in self.adminList:
                 for c in self.cmdList:
                     logging.info(c)
-                if c.Match(obj.message):
-                    c.Execute(self.rcon)
+                    if c.Match(obj.message):
+                        c.Execute(self.rcon, found[0])
         except:
             logging.warning("Error in message: %s" % obj.message)
             logging.exception("Stack Trace:")
@@ -128,7 +128,7 @@ class RconCommandItem():
         m = re.match(re.escape(self.regMatch), message )
         return m
 
-    def Execute(self, rcon):
+    def Execute(self, rcon, player):
         param = self.command.split(':')
         # run a usual server side command
         if len(param) <= 1:
@@ -138,6 +138,10 @@ class RconCommandItem():
             getattr(rcon, param[1])()
         elif len(param) >= 3:
             clsObj = rcon.loadmodule( param[0], param[1] )
-            getattr(clsObj, param[2])()
+            func = getattr(clsObj, param[2])(player)
+            if( len(inspect.getargspec(func).args) > 1):
+                func(player)
+            else:
+                func()
         else:
             logging.warning("Command '%s' matching '%s' is misconfigured (length: %d)" % (self.command, self.regMatch, len(param)))
