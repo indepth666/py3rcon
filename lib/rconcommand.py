@@ -18,8 +18,10 @@ class RconCommand(object):
         logging.debug('%s: initialized' % type(self).__name__)
 
     def showHelp(self, player):
-        logging.info("Show HELP")
         self.rcon.sendChat("Hi %s - You are py3rcon admin" % (player.name), player.number)
+        self.rcon.sendChat("Commands:", player.number)
+        for x in self.cmdList:
+            self.rcon.sendChat("%s" % (x.regMatch), player.number)
 
     """
     public: Set the destinaiton path of the commands configuration file
@@ -138,8 +140,8 @@ class RconCommandItem():
             getattr(rcon, param[1])()
         elif len(param) >= 3:
             clsObj = rcon.loadmodule( param[0], param[1] )
-            func = getattr(clsObj, param[2])(player)
-            if( len(inspect.getargspec(func).args) > 1):
+            func = getattr(clsObj, param[2])
+            if len(inspect.getargspec(func).args) > 1:
                 func(player)
             else:
                 func()
