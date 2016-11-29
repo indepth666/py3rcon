@@ -10,10 +10,10 @@
             "args": [
                 "config.json"
             ],
+            "console": "externalTerminal",
             "debugOptions": [
                 "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
+                "WaitOnNormalExit"
             ]
         },
         {
@@ -26,10 +26,11 @@
                 "-g",
                 "config.json"
             ],
-            "console": "integratedTerminal",
+            "console": "externalTerminal",
+            "stopOnEntry": true,
             "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit"
+                "BreakOnSystemExitZero",
+                "WaitOnAbnormalExit"
             ]
         }
     ]
