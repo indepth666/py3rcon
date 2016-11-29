@@ -88,7 +88,7 @@ class RconGUI(object):
 
     def OnPlayers(self, playerList):
         self.players = playerList
-        self.switchNavigation('player')
+        self.switchNavigation()
         
     def OnAbort(self):
         logging.debug("Quit GUI")
