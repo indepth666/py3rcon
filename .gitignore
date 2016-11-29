@@ -1,5 +1,6 @@
 .vscode/settings.json
 main.py
 config.json
+whitelist.json
 pyrcon.*.log
 **/*.pyc
