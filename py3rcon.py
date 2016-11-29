@@ -75,8 +75,13 @@ if not(GUI):
 ##
 if not(GUI) and 'commands' in config:
     modCommand = rcon.loadmodule('rconcommand', 'RconCommand')
-    _p = os.path.abspath(os.path.dirname(sys.argv[0]))
-    modCommand.setConfig(_p + '/' + config['commands'] )
+    modCommand.setConfig(config['commands'] )
+
+if not(GUI) and 'whitelist' in config:
+    modWhitelist = rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+    #_p = os.path.abspath(os.path.dirname(sys.argv[0]))
+    modWhitelist.setConfig(config['whitelist'])
+    modWhitelist.loadConfig()
 
 if GUI:
     modGUI = rcon.loadmodule('rcongui', 'RconGUI')
