@@ -1,18 +1,13 @@
 #!/usr/bin/python -B
 
-import os, signal, sys, argparse, threading, json, logging, tempfile
+import os, signal, sys, argparse, threading, json, logging, tempfile, time
 import lib
 from lib.rconprotocol import Rcon
-
-def signal_term_handler(signal, frame):
-    sys.exit(0)
-
-signal.signal(signal.SIGTERM, signal_term_handler)
 
 pid = str(os.getpid())
 
 _DESC = 'Python Rcon CLI for Arma servers'
-_VER = '0.1b'
+_VER = '0.2'
 
 parser = argparse.ArgumentParser(description=_DESC)
 parser.add_argument('configfile', help='configuration file in JSON')
@@ -33,7 +28,7 @@ _bstr = os.path.basename(args.configfile)
 _n = 48 - len(_bstr)
 
 #print('{} using configuration {}').format(_DESC, _bstr)
-print('version: {0}'.format(_VER))
+print('py3rcon version: %s - running on %s' % (_VER, os.name))
 print('')
 
 # Logging tool configuration
@@ -42,7 +37,7 @@ FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
 pidfile = '{}/py3rcon.{}.run'.format(tempfile.gettempdir(),config['server']['port'])
 
-print("You are running pyrcon on ", os.name)
+
 
 if not(GUI):
     if os.path.isfile(pidfile):
@@ -87,10 +82,16 @@ if GUI:
     modGUI = rcon.loadmodule('rcongui', 'RconGUI')
     modGUI.setLogfile( config['logfile'] )
 
+
 ##
 # Connect to server
 ##
-rcon.connect()
+try:
+    rcon.connectAsync()
+    print("Press CTRL + C to Exit")
+    while rcon.IsAborted() == False:
+        time.sleep(1)
+except (KeyboardInterrupt, SystemExit):
+    rcon.Abort()
 
-# remove PID
 if not(GUI): os.unlink(pidfile)
