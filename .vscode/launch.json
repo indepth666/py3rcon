@@ -27,7 +27,6 @@
                 "config.json"
             ],
             "console": "externalTerminal",
-            "stopOnEntry": true,
             "debugOptions": [
                 "BreakOnSystemExitZero",
                 "WaitOnAbnormalExit"

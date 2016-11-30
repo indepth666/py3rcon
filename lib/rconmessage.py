@@ -52,6 +52,8 @@ class RconMessage(object):
     This thread will send the chat message to everyone and sleeps for interval configured by setInterval(<min>) method
     """
     def _chatMessageLoop(self):
+        time.sleep(self.msgInterval)
+
         _l = len(self.msgList)
         _index = self.msgIndex
         if _l > 0 and not self.msgList[_index] == None:
@@ -62,6 +64,5 @@ class RconMessage(object):
         else:
             self.msgIndex += 1
 
-        if not self.rcon.IsAborted():
-            time.sleep(self.msgInterval)
+        if not self.rcon.IsAborted():           
             self._chatMessageLoop()

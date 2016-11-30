@@ -49,6 +49,7 @@ class Rcon():
         self.isExit = False
         self.isAuthenticated = False
         self.retry = 0
+        self.seq = 0
         self.lastcmd = ""
 
         # server message receive filters
@@ -109,15 +110,10 @@ class Rcon():
     Use the KeepAlive constant to define the interval
     """
     def _keepAliveThread(self):
-        _counter = 0
-        while not self.isExit:
-            time.sleep(1)
-            _counter += 1
-            if _counter%self.KeepAlive == 0:
-                self.sendCommand(None)
-
-            if _counter > self.KeepAlive:
-                _counter = 0
+        time.sleep(self.KeepAlive)
+        self.sendCommand(None)
+        if not self.isExit:
+            self._keepAliveThread()
 
     """
     private: to calculate the crc (Battleye).
@@ -142,7 +138,7 @@ class Rcon():
         command = bytearray()
         command.append(0xFF)
         command.append(0x01)
-        command.append(0x00)       #sequence number, must be incremented
+        command.append(self.seq)
 
         if toSendCommand:
             logging.debug('Sending command "{}"'.format(toSendCommand))
@@ -161,6 +157,7 @@ class Rcon():
         request.extend(command)
         #try:
         self.s.sendto(request ,(self.ip, self.port))
+        self.seq += 1
 
     """
     private: send the magic bytes to login as Rcon admin.
@@ -216,8 +213,11 @@ class Rcon():
         #ACKNOWLEDGE THE MESSAGE
         p = packet[0]
         try:
-            if p[0:2] == b'BE':
+            if p[0:2] == b'BE' and self.isAuthenticated:
                 self.s.sendto(self._acknowledge(p[8:9]), (self.ip, self.port))
+                self.seq -= 1
+                if self.seq < 0: self.seq = 0
+                    
         except:
             pass
 
@@ -241,9 +241,9 @@ class Rcon():
                 logging.error("Not Authenticated")
                 exit()
             # success message from the server for the previous command (or keep alive)
-            elif stream[6:] == b'\xff\x01\x00' and self.lastcmd:
+            elif stream[6:8] == b'\xff\x01' and self.lastcmd:
                 stream = "ACK {}".format(self.lastcmd)
-            elif stream[6:] == b'\xff\x01\x00' and not self.lastcmd:
+            elif stream[6:8] == b'\xff\x01' and not self.lastcmd:
                 stream = "KeepAlive"
             # all other packages and commands
             else:
@@ -362,11 +362,6 @@ class Rcon():
         if len(self.handleReconnect) > 0:
             for reconn in self.handleReconnect:
                 reconn()
-
-    def OnAbort(self):
-        if len(self.handleAbort) > 0:
-            for abr in self.handleAbort:
-                abr()
 
     def OnAbort(self):
         if len(self.handleAbort) > 0:

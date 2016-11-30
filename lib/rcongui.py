@@ -115,14 +115,12 @@ class RconGUI(object):
             t = threading.Thread(target=self._menuThread)
             t.daemon = True
             t.start()
-
-            time.sleep(2)
-            self.fetchPlayers()
         except:
             logging.error(sys.exc_info())
 
     def _menuThread(self):
         try:
+            self.fetchPlayers()
             self.display()
         except:
             logging.error(sys.exc_info())
