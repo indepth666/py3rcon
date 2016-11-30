@@ -51,7 +51,7 @@ if not(GUI):
 ##
 # Initialize the rconprotocol class
 ##
-rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'], True)
+rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'])
 
 ##
 # Load the rconrestart module and setup from configuration

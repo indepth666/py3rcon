@@ -23,12 +23,11 @@ class Rcon():
     """
     constructor: create an instance by passing ip, password and port as arguments
     """
-    def __init__(self, ip, password, Port, streamWriter=True):
+    def __init__(self, ip, password, Port):
         # constructor parameters
         self.ip = ip
         self.password = password
         self.port = int(Port)
-        self.writeConsole = streamWriter
 
         # module instances as dict (to have them loaded only once)
         self._instances = {}
@@ -220,38 +219,42 @@ class Rcon():
                     
         except:
             pass
+        
+        # Debug output the complete packet received from server
+        logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
-        #READ THE STREAM AND PRINT() IT
-        if self.writeConsole is True:
-            a = datetime.datetime.now()
-            stream = packet[0]
+        stream = packet[0]
 
-            # successfully authenticad packet received
-            if stream[6:] == b'\xff\x00\x01':
-                self.s.settimeout( self.Timeout )
-                stream = "Authenticated"
-                # Only do the below if this is the initial connect call
-                if not self.isAuthenticated:
-                    self.isAuthenticated = True
-                    self.OnConnected()
-                else:
-                    self.OnReconnected()
-            # when authentication failed, exit the program
-            elif stream[6:] == b'\xff\x00\x00':
-                logging.error("Not Authenticated")
-                exit()
-            # success message from the server for the previous command (or keep alive)
-            elif stream[6:8] == b'\xff\x01' and self.lastcmd:
-                stream = "ACK {}".format(self.lastcmd)
-            elif stream[6:8] == b'\xff\x01' and not self.lastcmd:
-                stream = "KeepAlive"
-            # all other packages and commands
+        # successfully authenticad packet received
+        if stream[6:] == b'\xff\x00\x01':
+            self.s.settimeout( self.Timeout )
+            logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, "Authenticated"))
+            # Only do the below if this is the initial connect call
+            if not self.isAuthenticated:
+                self.isAuthenticated = True
+                self.OnConnected()
             else:
-                stream = stream[9:].decode('utf-8', 'replace')
-                self._parseResponse(stream)
+                self.OnReconnected()
+            return
+        # when authentication failed, exit the program
+        if stream[6:] == b'\xff\x00\x00':
+            logging.error("Not Authenticated")
+            exit()
+        
+        # ausume when the last command is empty, its a keepAlive packet
+        if stream[6:8] == b'\xff\x01' and not self.lastcmd:
+            logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, "KeepAlive"))
+            return
+
+        # success message from the server for the previous command (or keep alive)
+        if stream[6:9] == b'\xff\x01' and self.lastcmd:
+            logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, "ACK " + self.lastcmd))
+        # all other packages and commands
+        if len(stream[9:]) > 0:
+            stream = stream[9:].decode('utf-8', 'replace')
+            self._parseResponse(stream)
 
             logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
-            logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
     def __players(self, pl):
         l = []
