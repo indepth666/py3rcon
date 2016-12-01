@@ -24,9 +24,6 @@ if not os.path.isfile(args.configfile):
 with open(args.configfile) as json_config:
     config = json.load(json_config)
 
-_bstr = os.path.basename(args.configfile)
-_n = 48 - len(_bstr)
-
 print("py3rcon version: %s - running on %s\n" % (_VER, os.name))
 
 # Logging tool configuration
@@ -37,7 +34,7 @@ pidfile = '{}/py3rcon.{}.run'.format(tempfile.gettempdir(),config['server']['por
 
 if not(GUI):
     if os.path.isfile(pidfile):
-        _tmp =('pyrcon is already running for {}:{}'.format(config['server']['host'], config['server']['port']))
+        _tmp = 'pyrcon is already running for %s:%s' % (config['server']['host'], config['server']['port'])
         print(_tmp)
         logging.info(_tmp)
         exit()
