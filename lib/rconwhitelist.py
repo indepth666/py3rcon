@@ -6,18 +6,18 @@ class RconWhitelist(object):
 
     Interval = 30 # interval how often the whitelist.json should be saved (default: every 30 seconds)
 
-    def __init__(self, rcon):
-        self.configFile = None
+    def __init__(self, rcon, configFile):
+        self.configFile = configFile
         self.rcon = rcon
         self.whitelist = []
         self.changed = False
         self.modified = None
 
-    def setConfig(self, configFile):
-        self.configFile = configFile
-
         if not(os.path.isfile(self.configFile)):
             open(self.configFile, 'a').close()
+
+        logging.info("[WHITELIST] Loading whitelist...")
+        self.loadConfig()
 
         # thread to save whitelist.json every X 
         t = threading.Thread(target=self.saveConfig)
@@ -27,7 +27,7 @@ class RconWhitelist(object):
         t = threading.Thread(target=self.watchConfig)
         t.daemon = True
         t.start()
-    
+         
     """
     public: (Re)Load the commands configuration file
     """

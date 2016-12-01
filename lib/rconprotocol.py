@@ -30,7 +30,7 @@ class Rcon():
         self.port = int(Port)
 
         # module instances as dict (to have them loaded only once)
-        self._instances = {}
+        self.__instances = {}
 
         # connection handler
         self.handleConnect = []
@@ -75,15 +75,15 @@ class Rcon():
     @param string name - module name without .py suffix
     @param string cls  - class name to create an instance of
     """
-    def loadmodule(self, name, cls):
+    def loadmodule(self, name, cls, *args):
         if type(self).__name__ == cls:
             return self
 
         key = "%s.%s" % (name, cls)
-        if not key in self._instances.keys():
+        if not key in self.__instances.keys():
             mod = importlib.import_module('lib.' + name)
             classT = getattr(mod, cls);
-            clsObj = classT(self)
+            clsObj = classT(self, *args)
 
             if "OnConnected" in dir(clsObj):
                 self.handleConnect.append(clsObj.OnConnected)
@@ -100,9 +100,9 @@ class Rcon():
             if "OnAbort" in dir(clsObj):
                 self.handleAbort.append(clsObj.OnAbort)
 
-            self._instances[key] = clsObj
+            self.__instances[key] = clsObj
 
-        return self._instances[key]
+        return self.__instances[key]
 
     """
     private: threaded method sending keepAlive messages to the server.
@@ -252,7 +252,7 @@ class Rcon():
         # all other packages and commands
         if len(stream[9:]) > 0:
             stream = stream[9:].decode('utf-8', 'replace')
-            self._parseResponse(stream)
+            self.__parseResponse(stream)
 
             logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, stream))
 
@@ -275,7 +275,7 @@ class Rcon():
     """
     private: parse the incoming message from _streamReader to provide eventing
     """
-    def _parseResponse(self, msg):
+    def __parseResponse(self, msg):
         for x in self.receiveFilter:
             regex, action, multiline = x
             if multiline:
@@ -350,7 +350,7 @@ class Rcon():
     def OnConnected(self):
         # initialize keepAlive thread
         _t = threading.Thread(target=self._keepAliveThread)
-        _t.deamon = True
+        _t.daemon = True
         _t.start()
 
         if len(self.handleConnect) > 0:
@@ -372,25 +372,16 @@ class Rcon():
                 abr()
 
     """
-    public: check if program is about to exit
-    """
-    def IsAborted(self):
-        return self.isExit
-
-    """
     public: cancel all loops (keepAlive and others from modules) and send the final "exit" command to disconnect from server
     """
     def Abort(self):
         logging.info("Exit loop")
         self.isExit = True
         self.OnAbort()
-        # send the final kill and force socket to call recvfrom (and dont wait for an answer)
-        self.s.settimeout(0.0)
-        self.sendCommand(None)
 
     def connectAsync(self):
-        _t = threading.Thread(target=self.connect)
-        _t.deamon = True
+        _t = threading.Thread(target=self.connect, name='connectionThread')
+        _t.daemon = True
         _t.start()
 
     """

@@ -3,11 +3,13 @@ from curses import panel
 from curses import textpad
 
 class RconGUI(object):
-    def __init__(self, rcon):
+    def __init__(self, rcon, config):
         self.rcon = rcon
         self.logFile = None
         self.logThread = None
         self.cancelCommand = False
+
+        self.setLogfile(config['logfile'])
 
         self.navigation = {
             'menu': self.showMenu,
@@ -192,7 +194,7 @@ class RconGUI(object):
     def updateLog(self):
         time.sleep(2)
 
-        if self.rcon.IsAborted():
+        if self.rcon.isExit:
             return
 
         if not hasattr(self, 'logWnd'):

@@ -7,8 +7,8 @@ RconCommand class used to read admin commands sent through normal chat messages.
 Check out the commands.json for a command list available for admins
 """
 class RconCommand(object):
-    def __init__(self, rcon):
-        self.configFile = None
+    def __init__(self, rcon, configFile):
+        self.configFile = configFile
         self.adminList = []
         self.cmdList = []
         self.players = []
@@ -22,13 +22,6 @@ class RconCommand(object):
         self.rcon.sendChat("Commands:", player.number)
         for x in self.cmdList:
             self.rcon.sendChat("%s" % (x.regMatch), player.number)
-
-    """
-    public: Set the destinaiton path of the commands configuration file
-    @param string configFile - absolute path of the configuration file
-    """
-    def setConfig(self, configFile):
-        self.configFile = configFile
 
     """
     public: (Re)Load the commands configuration file

@@ -8,13 +8,16 @@ import time
 RconMessage class used to repeatedly sent server info messages
 """
 class RconMessage(object):
-    def __init__(self, rcon):
+    def __init__(self, rcon, config):
         # chat messages
         self.msgList = None
         self.msgInterval = 0
         self.msgIndex = 0
 
         self.rcon = rcon
+
+        self.setInterval(config['interval'] )
+        self.setMessages(config['messages'] )
 
         logging.debug('%s() initialized' % type(self).__name__)
 
@@ -64,5 +67,5 @@ class RconMessage(object):
         else:
             self.msgIndex += 1
 
-        if not self.rcon.IsAborted():           
+        if not self.rcon.isExit:           
             self._chatMessageLoop()

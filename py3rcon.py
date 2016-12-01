@@ -27,17 +27,13 @@ with open(args.configfile) as json_config:
 _bstr = os.path.basename(args.configfile)
 _n = 48 - len(_bstr)
 
-#print('{} using configuration {}').format(_DESC, _bstr)
-print('py3rcon version: %s - running on %s' % (_VER, os.name))
-print('')
+print("py3rcon version: %s - running on %s\n" % (_VER, os.name))
 
 # Logging tool configuration
 print('Logging to: {}'.format(config['logfile']))
 FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
 pidfile = '{}/py3rcon.{}.run'.format(tempfile.gettempdir(),config['server']['port'])
-
-
 
 if not(GUI):
     if os.path.isfile(pidfile):
@@ -48,55 +44,34 @@ if not(GUI):
 
     open(pidfile, 'w').write(pid)
 
-##
-# Initialize the rconprotocol class
-##
-rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'])
-
-##
-# Load the rconrestart module and setup from configuration
-##
-if not(GUI):
-    modRestart = rcon.loadmodule('rconrestart', 'RconRestart')
-    modRestart.setMessages(config['restart']['messages'] )
-    modRestart.setInterval(config['restart']['interval'] )
-    modRestart.setExitOnRestart(config['restart']['exitonrestart'])
-
-##
-# Load the rconmessage module and setup from configuration
-##
-if not(GUI):
-    modMessage = rcon.loadmodule('rconmessage', 'RconMessage')
-    modMessage.setInterval(config['repeatMessage']['interval'] )
-    modMessage.setMessages(config['repeatMessage']['messages'] )
-
-##
-# Load the rcon admin commands module
-##
-if not(GUI) and 'commands' in config:
-    modCommand = rcon.loadmodule('rconcommand', 'RconCommand')
-    modCommand.setConfig(config['commands'] )
-
-if not(GUI) and 'whitelist' in config:
-    modWhitelist = rcon.loadmodule('rconwhitelist', 'RconWhitelist')
-    #_p = os.path.abspath(os.path.dirname(sys.argv[0]))
-    modWhitelist.setConfig(config['whitelist'])
-    modWhitelist.loadConfig()
-
-if GUI:
-    modGUI = rcon.loadmodule('rcongui', 'RconGUI')
-    modGUI.setLogfile( config['logfile'] )
-
-
-##
-# Connect to server
-##
 try:
+    ##
+    # Initialize the rconprotocol class
+    ##
+    rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'])
+
+    if not(GUI):
+        # Load the rconrestart module and setup from configuration
+        rcon.loadmodule('rconrestart', 'RconRestart', config['restart'])
+        # Load the rconmessage module and setup from configuration
+        rcon.loadmodule('rconmessage', 'RconMessage', config['repeatMessage'])
+        # Load the rcon admin commands module
+        if 'commands' in config: rcon.loadmodule('rconcommand', 'RconCommand', config['commands'])
+
+    if 'whitelist' in config:
+        rcon.loadmodule('rconwhitelist', 'RconWhitelist', config['whitelist'])
+        
+    if GUI:
+        rcon.loadmodule('rcongui', 'RconGUI', config)
+
+    # connect to server (async)
     rcon.connectAsync()
     print("Press CTRL + C to Exit")
-    while rcon.IsAborted() == False:
+    while rcon.isExit == False:
         time.sleep(1)
 except (KeyboardInterrupt, SystemExit):
     rcon.Abort()
-
-if not(GUI): os.unlink(pidfile)
+except:
+    raise
+finally:
+    if not(GUI): os.unlink(pidfile)

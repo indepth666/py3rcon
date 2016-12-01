@@ -12,7 +12,7 @@ Please note that this module will only exit the server.
 You may need an additional script (or watchdog) to get the server back online.
 """
 class RconRestart(object):
-    def __init__(self, rcon):
+    def __init__(self, rcon, config):
         # shutdown and shutdown message scheduler
         self.sched = sched.scheduler(time.time, time.sleep)
         self.shutdownTimer = 0
@@ -22,6 +22,10 @@ class RconRestart(object):
         self.canceled = False
         self.rcon = rcon
 
+        self.setMessages(config['messages'])
+        self.setInterval(config['interval'])
+        self.setExitOnRestart(config['exitonrestart'])
+        
         logging.debug('%s() initialized' % type(self).__name__)
 
     """
