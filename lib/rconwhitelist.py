@@ -6,12 +6,13 @@ class RconWhitelist(object):
 
     Interval = 30 # interval how often the whitelist.json should be saved (default: every 30 seconds)
 
-    def __init__(self, rcon, configFile):
+    def __init__(self, rcon, configFile, GUI=False):
         self.configFile = configFile
         self.rcon = rcon
         self.whitelist = []
         self.changed = False
         self.modified = None
+        self.GUI = GUI
 
         if not(os.path.isfile(self.configFile)):
             open(self.configFile, 'a').close()
@@ -19,10 +20,11 @@ class RconWhitelist(object):
         logging.info("[WHITELIST] Loading whitelist...")
         self.loadConfig()
 
+        if self.GUI: return
+
         # thread to save whitelist.json every X 
-        t = threading.Thread(target=self.saveConfig)
-        t.daemon = True
-        t.start()
+        self.saveConfigAsync()
+
         # thread to watch for file changes
         t = threading.Thread(target=self.watchConfig)
         t.daemon = True
@@ -52,19 +54,21 @@ class RconWhitelist(object):
         if self.modified != mtime:
             self.loadConfig()
             self.fetchPlayers()
-            sys.stdout.write('R')
-
-        sys.stdout.flush()
 
         self.watchConfig()
 
+    def saveConfigAsync(self):
+        t = threading.Thread(target=self.saveConfig)
+        t.daemon = True
+        t.start()
+
     def saveConfig(self):
-        if self.changed:        
+        if self.changed or self.GUI:
             with open(self.configFile, 'w') as outfile:
                 json.dump([ob.__dict__ for ob in self.whitelist], outfile, indent=4, sort_keys=True)
-                sys.stdout.write('W')
-                sys.stdout.flush()
         
+        if self.GUI: return
+
         self.changed = False
         time.sleep(self.Interval)
         self.saveConfig()

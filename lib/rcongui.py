@@ -19,7 +19,7 @@ class RconGUI(object):
         }
         self.mainmenu = [
             ('Refresh Players', self.fetchPlayers),
-            ('Send Hello', self.sayHello),
+            ('Manage Whitelist', self.manageWhitelist),
             ('Kick All', self.rcon.kickAll),
             ('Shutdown (immediately)', self.shutdownServer),
             ('Exit','exit')
@@ -32,6 +32,8 @@ class RconGUI(object):
         self.__prevnav = None
         # menu cursor position
         self.position = 0
+        # is whitelist
+        self.isWhitelist = False
         # player cursor position
         self.playerpos = 0
         self.players = []
@@ -92,7 +94,8 @@ class RconGUI(object):
 
     def OnPlayers(self, playerList):
         self.players = playerList
-        self.switchNavigation()
+        self.isWhitelist = False
+        self.showPlayers()
         
     def OnAbort(self):
         logging.debug("Quit GUI")
@@ -102,17 +105,45 @@ class RconGUI(object):
         self.rcon.sendCommand('#shutdown')
 
     def kickPlayer(self):
-        playerObj = self.players[self.playerpos]
-        logging.debug("Kicking player '%s'" % playerObj.name)
+        player = self.players[self.playerpos]
+        logging.debug("Kicking player '%s'" % player.name)
 
-        self.rcon.sendCommand('kick %s' % playerObj.number)
+        self.rcon.sendCommand('kick %s' % player.number)
         return self.getMainMenu()
 
     def fetchPlayers(self):
+        self.isWhitelist = False
+        self.players = []
+        self.showPlayers()
         self.rcon.sendCommand('players')
 
-    def sayHello(self):
-        self.rcon.sendChat("Hello World!")
+    def manageWhitelist(self):
+        clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+        self.players = clsWhitelist.whitelist
+        self.isWhitelist = True
+        self.showPlayers()
+    
+    def removePlayerWhitelist(self):
+        player = self.players[self.playerpos]
+        player.allowed = False
+
+        clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+        clsWhitelist.saveConfigAsync()
+
+        logging.info('Player removed from WHITELIST')
+        self.showPlayers()
+        return 'playermenu'
+
+    def addPlayerWhitelist(self):
+        player = self.players[self.playerpos]
+        player.allowed = True
+
+        clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+        clsWhitelist.saveConfigAsync()
+
+        logging.info('Player removed from WHITELIST')
+        self.showPlayers()
+        return 'playermenu'
 
     def OnConnected(self):
         try:
@@ -264,8 +295,13 @@ class RconGUI(object):
         self.playermenu = list(self.backMenu)
 
         if len(self.players) > 0:
-            playerObj = self.players[self.playerpos]
-            self.playermenu.append( ('Kick %s' % playerObj.name, self.kickPlayer) )
+            player = self.players[self.playerpos]
+            self.playermenu.append( ('Kick %s' % player.name, self.kickPlayer) )
+            if player.allowed:
+                self.playermenu.append( ('Remove from Whitelist', self.removePlayerWhitelist) )
+            else:
+                self.playermenu.append( ('Add To Whitelist', self.addPlayerWhitelist) )
+            
 
         for index, item in enumerate(self.playermenu):
             mode = curses.A_NORMAL
@@ -294,7 +330,12 @@ class RconGUI(object):
 
             if index == self.playerpos and self.__navigation == 'player':
                 _m = curses.color_pair(1)
-            self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player.name, index), _m)
+            
+            if self.isWhitelist:
+                allowed = '[Y]' if player.allowed else '[N]'
+                self.playerWnd.addstr(1 + _row , _offsetX, "%s %s" % (allowed, player.name), _m)
+            else:
+                self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player.name, index), _m)
             _row += 1
         self.playerWnd.refresh()
 

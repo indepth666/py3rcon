@@ -56,7 +56,7 @@ try:
         if 'commands' in config: rcon.loadmodule('rconcommand', 'RconCommand', config['commands'])
 
     if 'whitelist' in config:
-        rcon.loadmodule('rconwhitelist', 'RconWhitelist', config['whitelist'])
+        rcon.loadmodule('rconwhitelist', 'RconWhitelist', config['whitelist'], GUI)
         
     if GUI:
         rcon.loadmodule('rcongui', 'RconGUI', config)
