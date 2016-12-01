@@ -70,7 +70,7 @@ class Rcon():
         key = "%s.%s" % (name, cls)
         if not key in self.__instances.keys():
             mod = importlib.import_module('lib.' + name)
-            classT = getattr(mod, cls);
+            classT = getattr(mod, cls)
             clsObj = classT(self, *args)
 
             self.__instances[key] = clsObj
@@ -105,8 +105,8 @@ class Rcon():
         if not self.isAuthenticated:
             logging.error('Command failed - Not Authenticated')
             return
-        # request =  "B" + "E" + 4 bytes crc check + command
 
+        # request =  "B" + "E" + 4 bytes crc check + command
         command = bytearray()
         command.append(0xFF)
         command.append(0x01)
@@ -123,7 +123,7 @@ class Rcon():
         request = bytearray(b'BE')
         request.extend( self.__compute_crc(command) )
         request.extend(command)
-        #try:
+
         self.s.sendto(request ,(self.ip, self.port))
         self.seq += 1
 
@@ -166,7 +166,7 @@ class Rcon():
     private: handle all incoming server messages from socket.recvfrom method
     @param unknown packet - received package
     """
-    def _streamReader(self, packet):
+    def __streamReader(self, packet):
         # reset the retries if from now one some connection problems occured
         self.retry = 0
 
@@ -234,7 +234,7 @@ class Rcon():
         self.OnChat( ChatMessage( m[0], m[1], m[2]) )
 
     """
-    private: parse the incoming message from _streamReader to provide eventing
+    private: parse the incoming message from __streamReader to provide eventing
     """
     def __parseResponse(self, msg):
         for x in self.receiveFilter:
@@ -357,7 +357,7 @@ class Rcon():
             # receive data from client (data, addr)
             while not self.isExit:
                 d = self.s.recvfrom(2048)           #1024 value crash on players request on full server
-                self._streamReader(d)
+                self.__streamReader(d)
 
         # Connection timed out
         except socket.timeout as et:
