@@ -15,17 +15,21 @@ class RconGUI(object):
             'menu': self.showMenu,
             'playermenu': self.showPlayerMenu,
             'player': self.showPlayers,
+            'missionmenu': self.showMissionMenu,
             'command': self.showCommandLine
         }
         self.mainmenu = [
             ('Refresh Players', self.fetchPlayers),
             ('Manage Whitelist', self.manageWhitelist),
+            ('Restart Mission...', self.fetchMissions),
             ('Kick All', self.rcon.kickAll),
-            ('Shutdown (immediately)', self.shutdownServer),
-            ('Exit','exit')
+            ('Shutdown Server', self.shutdownServer),
+            ('Restart Server (v1.65)', self.restartServer),
+            ('Exit', None)
         ]
 
         self.playermenu = []
+        self.missionmenu = []
         self.backMenu = [('Main Menu', self.getMainMenu)]
 
         self.__navigation = self.getMainMenu()
@@ -96,6 +100,10 @@ class RconGUI(object):
         self.players = playerList
         self.isWhitelist = False
         self.showPlayers()
+
+    def OnMissions(self, missionList):
+        self.missionmenu = missionList
+        self.showMissionMenu()
         
     def OnAbort(self):
         logging.debug("Quit GUI")
@@ -103,6 +111,14 @@ class RconGUI(object):
 
     def shutdownServer(self):
         self.rcon.sendCommand('#shutdown')
+
+    def restartServer(self):
+        self.rcon.sendCommand('#restartserver')
+
+    def restartMission(self):
+        m = self.missionmenu[self.position]
+        self.rcon.sendCommand('#mission %s' % m)
+        return self.getMainMenu()
 
     def kickPlayer(self):
         player = self.players[self.playerpos]
@@ -116,6 +132,9 @@ class RconGUI(object):
         self.players = []
         self.showPlayers()
         self.rcon.sendCommand('players')
+
+    def fetchMissions(self):
+        self.rcon.sendCommand('missions')
 
     def manageWhitelist(self):
         clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
@@ -189,7 +208,7 @@ class RconGUI(object):
 
         res = ''
         # clean up the menu window because other menus might have less info than the other
-        if self.__navigation == 'menu' or self.__navigation == 'playermenu':
+        if self.__navigation == 'menu' or self.__navigation == 'playermenu' or self.__navigation == 'missionmenu':
             res = self.inputMenu()
         elif self.__navigation == 'player':
             res = self.inputMenu()
@@ -199,10 +218,13 @@ class RconGUI(object):
         self.__navigation = res
 
     def navigate(self, n):
-        if self.__navigation == 'menu' or self.__navigation == 'playermenu':
+        if self.__navigation == 'menu' or self.__navigation == 'playermenu' or self.__navigation == 'missionmenu':
             _length = len(self.mainmenu)
             if self.__navigation == 'playermenu':
                 _length = len(self.playermenu)
+            elif self.__navigation == 'missionmenu':
+                _length = len(self.missionmenu)
+
             if (self.position + n) < 0:
                 self.position = 0
             elif (self.position + n) >= _length:
@@ -282,6 +304,18 @@ class RconGUI(object):
                 mode = curses.color_pair(1)
             msg = ' %s' % item[0]
             self.menuWnd.addstr(1+index, 1, msg, mode)
+
+        self.menuWnd.refresh()
+
+    def showMissionMenu(self):
+        self.menuWnd.clear()
+        self.menuWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
+
+        for index, item in enumerate(self.missionmenu):
+            mode = curses.A_NORMAL
+            if index == self.position and self.__navigation == 'missionmenu':
+                mode = curses.color_pair(1)
+            self.menuWnd.addstr(1+index, 1, item, mode)
 
         self.menuWnd.refresh()
 
@@ -389,6 +423,9 @@ class RconGUI(object):
                 if self.position == len(self.mainmenu)-1:
                     _result = ''
                     return
+                elif self.position == 2:
+                    self.mainmenu[self.position][1]()
+                    _result = 'missionmenu'
                 else:
                     self.mainmenu[self.position][1]()
             elif self.__navigation == 'playermenu':
@@ -396,6 +433,10 @@ class RconGUI(object):
             elif self.__navigation == 'player':
                 self.position = 0
                 _result = 'playermenu'
+            elif self.__navigation == 'missionmenu':
+                _result = self.restartMission()
+                self.position = 0
+
         elif key == curses.KEY_UP:
             self.navigate( -1 )
         elif key == curses.KEY_DOWN:
