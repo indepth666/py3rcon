@@ -43,6 +43,8 @@ class Rcon():
         self.receiveFilter = [
             # receive all players
             ("\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
+            # receive missions
+            ("\n(.*\.[A-z0-9_-]+\.pbo)", self.__missions, True),
             # when player is connected
             ("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", self.__playerConnect, False),
             # when player is disconnected
@@ -223,6 +225,9 @@ class Rcon():
             l.append( Player(m[0], m[3], m[4]) )
 
         self.OnPlayers(l)
+    
+    def __missions(self, missions):
+        self.OnMissions(missions)
 
     def __playerConnect(self, m):
         self.OnPlayerConnect( Player(m[1], m[0], m[2]) )
@@ -273,10 +278,21 @@ class Rcon():
         self.sendCommand('#lock')
         time.sleep(1)
 
+    """
+    Event: when list of players is requested
+    """
     def OnPlayers(self, playerList):
         for clsObj in self.__instances.values():
             func = getattr(clsObj, 'OnPlayers', None)
             if func: func(playerList)
+
+    """
+    Event: when mission files are requested
+    """
+    def OnMissions(self, missionList):
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnMissions', None)
+            if func: func(missionList)
 
     """
     Event: when a player connects to the server
