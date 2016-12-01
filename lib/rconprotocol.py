@@ -32,18 +32,6 @@ class Rcon():
         # module instances as dict (to have them loaded only once)
         self.__instances = {}
 
-        # connection handler
-        self.handleConnect = []
-        self.handleReconnect = []
-        # player connect and disconnect handler
-        self.handlePlayerConnect = []
-        self.handlePlayers = []
-        self.handlePlayerDisconnect = []
-        # handle chat messages
-        self.handleChat = []
-        # handle Abort message
-        self.handleAbort = []
-
         # last timestamp used for checkinh keepalive
         self.isExit = False
         self.isAuthenticated = False
@@ -84,21 +72,6 @@ class Rcon():
             mod = importlib.import_module('lib.' + name)
             classT = getattr(mod, cls);
             clsObj = classT(self, *args)
-
-            if "OnConnected" in dir(clsObj):
-                self.handleConnect.append(clsObj.OnConnected)
-            if "OnReconnected" in dir(clsObj):
-                self.handleReconnect.append(clsObj.OnReconnected)
-            if "OnPlayerConnect" in dir(clsObj):
-                self.handlePlayerConnect.append(clsObj.OnPlayerConnect)
-            if "OnPlayerDisconnect" in dir(clsObj):
-                self.handlePlayerDisconnect.append(clsObj.OnPlayerDisconnect)
-            if "OnPlayers" in dir(clsObj):
-                self.handlePlayers.append(clsObj.OnPlayers)
-            if "OnChat" in dir(clsObj):
-                self.handleChat.append(clsObj.OnChat)
-            if "OnAbort" in dir(clsObj):
-                self.handleAbort.append(clsObj.OnAbort)
 
             self.__instances[key] = clsObj
 
@@ -312,36 +285,35 @@ class Rcon():
         self.sendCommand('#lock')
         time.sleep(1)
 
-
     def OnPlayers(self, playerList):
-        if len(self.handlePlayers) > 0:
-            for pl in self.handlePlayers:
-                pl(playerList)
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnPlayers', None)
+            if func: func(playerList)
 
     """
     Event: when a player connects to the server
     """
     def OnPlayerConnect(self, player):
-        if len(self.handlePlayerConnect) > 0:
-            for pconn in self.handlePlayerConnect:
-                pconn(player)
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnPlayerConnect', None)
+            if func: func(player)
 
     """
     Event: when a player disconnects from the server
     """
     def OnPlayerDisconnect(self, player):
-        if len(self.handlePlayerDisconnect) > 0:
-            for pdis in self.handlePlayerDisconnect:
-                pdis(player)
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnPlayerDisconnect', None)
+            if func: func(player)
 
     """
     Event: Incoming chat messages
     @param ChatMessage chatObj - chat object containing channel and message
     """
     def OnChat(self, chatObj):
-        if len(self.handleChat) > 0:
-            for cmsg in self.handleChat:
-                cmsg(chatObj)
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnChat', None)
+            if func: func(chatObj)
 
     """
     Event: when program is successfully connected and authenticated to the server.
@@ -353,23 +325,23 @@ class Rcon():
         _t.daemon = True
         _t.start()
 
-        if len(self.handleConnect) > 0:
-            for conn in self.handleConnect:
-                conn()
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnConnected', None)
+            if func: func()
 
     """
     Event: when program is successfully reconnected and authenticated to the server.
            This can perfectly be used in modules.
     """
     def OnReconnected(self):
-        if len(self.handleReconnect) > 0:
-            for reconn in self.handleReconnect:
-                reconn()
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnReconnected', None)
+            if func: func()
 
     def OnAbort(self):
-        if len(self.handleAbort) > 0:
-            for abr in self.handleAbort:
-                abr()
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnAbort', None)
+            if func: func()
 
     """
     public: cancel all loops (keepAlive and others from modules) and send the final "exit" command to disconnect from server

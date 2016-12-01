@@ -1,4 +1,4 @@
-import os, logging, threading, time, re, json
+import os, logging, time, re, json
 import inspect
 import lib.rconprotocol
 
