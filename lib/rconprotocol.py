@@ -91,7 +91,7 @@ class Rcon():
     private: to calculate the crc (Battleye).
     More Info: http://www.battleye.com/downloads/BERConProtocol.txt
     """
-    def _compute_crc(self, Bytes):
+    def __compute_crc(self, Bytes):
         buf = memoryview(Bytes)
         crc = binascii.crc32(buf) & 0xffffffff
         crc32 = '0x%08x' % crc
@@ -121,11 +121,7 @@ class Rcon():
         self.lastcmd = toSendCommand
 
         request = bytearray(b'BE')
-        crc1, crc2, crc3, crc4 = self._compute_crc(command)
-        request.append(crc1)
-        request.append(crc2)
-        request.append(crc3)
-        request.append(crc4)
+        request.extend( self.__compute_crc(command) )
         request.extend(command)
         #try:
         self.s.sendto(request ,(self.ip, self.port))
@@ -145,11 +141,7 @@ class Rcon():
         command.extend(passwd.encode('utf-8','replace'))
 
         request = bytearray(b'BE')
-        crc1, crc2, crc3, crc4 = self._compute_crc(command)
-        request.append(crc1)
-        request.append(crc2)
-        request.append(crc3)
-        request.append(crc4)
+        request.extend( self.__compute_crc(command) )
         request.extend(command)
 
         return request
@@ -165,11 +157,7 @@ class Rcon():
         command.extend(Bytes)
 
         request = bytearray(b'BE')
-        crc1, crc2, crc3, crc4 = self._compute_crc(command)
-        request.append(crc1)
-        request.append(crc2)
-        request.append(crc3)
-        request.append(crc4)
+        request.extend( self.__compute_crc(command) )
         request.extend(command)
 
         return request

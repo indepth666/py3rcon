@@ -47,15 +47,18 @@ class RconGUI(object):
 
         try:
             self.screen = curses.initscr()
+
+            if not self.checkMaxSize():
+                curses.endwin()
+                print('THE TERMINAL WINDOW IS TO SMALL (width/height)')
+                return
+
             self.initColors()
 
             curses.cbreak()
             curses.noecho()
             curses.curs_set(0)
-
-            if not self.checkMaxSize():
-                raise Exception('THE TERMINAL WINDOW IS TO SMALL (width/height)')
-            
+           
             self.menuWnd = self.screen.subwin(*self.posAndSize['menu'])
             self.menuWnd.keypad(1)
 
@@ -67,8 +70,7 @@ class RconGUI(object):
             self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
         except:
-            self.exitCurses()
-            print("\nRconGUI Exception:", sys.exc_info()[0])
+            curses.endwin()
             raise
 
     def getMainMenu(self):
@@ -94,7 +96,7 @@ class RconGUI(object):
         
     def OnAbort(self):
         logging.debug("Quit GUI")
-        self.exitCurses()
+        curses.endwin()
 
     def shutdownServer(self):
         self.rcon.sendCommand('#shutdown')
@@ -128,10 +130,6 @@ class RconGUI(object):
             logging.error(sys.exc_info())
 
         self.rcon.Abort()
-
-    def exitCurses(self):
-        curses.nocbreak(); self.screen.keypad(0); curses.echo();
-        curses.endwin()
 
     def checkMaxSize(self):
         _res = True
