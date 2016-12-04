@@ -103,6 +103,7 @@ class RconGUI(object):
 
     def OnMissions(self, missionList):
         self.missionmenu = missionList
+        self.missionmenu.append("Back")
         self.showMissionMenu()
         
     def OnAbort(self):
@@ -117,7 +118,8 @@ class RconGUI(object):
 
     def restartMission(self):
         m = self.missionmenu[self.position]
-        self.rcon.sendCommand('#mission %s' % m)
+        if m != 'Back':
+            self.rcon.sendCommand('#mission %s' % m)
         return self.getMainMenu()
 
     def kickPlayer(self):
