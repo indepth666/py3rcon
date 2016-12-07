@@ -2,83 +2,35 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python",
+            "name": "Py3rcon",
             "type": "python",
             "request": "launch",
-            "stopOnEntry": true,
             "pythonPath": "${config.python.pythonPath}",
             "program": "${workspaceRoot}/py3rcon.py",
             "args": [
                 "config.json"
             ],
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Python Console App",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": true,
-            "pythonPath": "${config.python.pythonPath}",
-            "program": "${workspaceRoot}/py3rcon.py",
-            "args": [
-                "--gui",
-                "config.json"
-            ],
-            "externalConsole": true,
+            "console": "externalTerminal",
             "debugOptions": [
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit"
             ]
         },
         {
-            "name": "Django",
+            "name": "Py3rcon GUI",
             "type": "python",
             "request": "launch",
-            "stopOnEntry": true,
             "pythonPath": "${config.python.pythonPath}",
-            "program": "${workspaceRoot}/manage.py",
+            "program": "${workspaceRoot}/py3rcon.py",
             "args": [
-                "runserver",
-                "--noreload"
+                "-g",
+                "config.json"
             ],
+            "console": "externalTerminal",
             "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput",
-                "DjangoDebugging"
+                "BreakOnSystemExitZero",
+                "WaitOnAbnormalExit"
             ]
-        },
-        {
-            "name": "Watson",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": true,
-            "pythonPath": "${config.python.pythonPath}",
-            "program": "${workspaceRoot}/console.py",
-            "args": [
-                "dev",
-                "runserver",
-                "--noreload=True"
-            ],
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Attach",
-            "type": "python",
-            "request": "attach",
-            "localRoot": "${workspaceRoot}",
-            "remoteRoot": "${workspaceRoot}",
-            "port": 3000,
-            "secret": "my_secret",
-            "host": "localhost"
         }
     ]
 }

@@ -1,29 +1,41 @@
 {
-    "logfile":"pyrcon.test.log",
-    "loglevel": 10,
-    "server": {
-	"host":"127.0.0.1",
-	"port":2402,
-	"rcon_password":"yourRconPassword"
-    },
-    "commands": "commands.json",
-    "restart": {
-	"interval": 240,
-	"exitonrestart": true,
-	"messages": [
-	    [10, "RESTART IN 10 MINUTES"],
-	    [ 5, "RESTART IN 5 MINUTES" ],
-	    [ 3, "RESTART IN 3 MINUTES" ],
-	    [ 1, "RESTART IN 1 MINUTE"  ]
-	]
-    },
-    "repeatMessage":{
-	"interval": 20,
-	"messages": [
-	    "This Server is using py3rcon.py",
-	    "Authors: indepth666 (Basic protocol design), ole1986 (CLI)",
-            "Github: https://github.com/indepth666/python3rcon",
-            "Github(forked): https://github.com/ole1986/python3rcon"
-	]
-    }
+	"logfile": "pyrcon.test.log",
+	"loglevel": 10,
+	"server": {
+		"host": "127.0.0.1",
+		"port": 2402,
+		"rcon_password": "yourRconPassword"
+	},
+	"commands": "commands.json",
+	"whitelist": "whitelist.json",
+	"restart": {
+		"interval": 240,
+		"exitonrestart": true,
+		"messages": [
+			[
+				10,
+				"RESTART IN 10 MINUTES"
+			],
+			[
+				5,
+				"RESTART IN 5 MINUTES"
+			],
+			[
+				3,
+				"RESTART IN 3 MINUTES"
+			],
+			[
+				1,
+				"RESTART IN 1 MINUTE"
+			]
+		]
+	},
+	"repeatMessage": {
+		"interval": 10,
+		"messages": [
+			"This Server is using py3rcon.py",
+			"Authors: indepth666 (Basic protocol design), ole1986 (CLI)",
+			"Github: https://github.com/indepth666/python3rcon"
+		]
+	}
 }

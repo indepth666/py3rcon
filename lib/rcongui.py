@@ -1,41 +1,43 @@
-import os
-import sys
-import curses
+import os, sys, logging, threading, time, curses
 from curses import panel
 from curses import textpad
-import lib.rconprotocol
-import logging
-import threading
-import time
 
 class RconGUI(object):
-    def __init__(self, rcon):
+    def __init__(self, rcon, config):
         self.rcon = rcon
         self.logFile = None
         self.logThread = None
         self.cancelCommand = False
 
+        self.setLogfile(config['logfile'])
+
         self.navigation = {
             'menu': self.showMenu,
             'playermenu': self.showPlayerMenu,
             'player': self.showPlayers,
+            'missionmenu': self.showMissionMenu,
             'command': self.showCommandLine
         }
         self.mainmenu = [
             ('Refresh Players', self.fetchPlayers),
-            ('Send Hello', self.sayHello),
+            ('Manage Whitelist', self.manageWhitelist),
+            ('Restart Mission...', self.fetchMissions),
             ('Kick All', self.rcon.kickAll),
-            ('Shutdown (immediately)', self.shutdownServer),
-            ('Exit','exit')
+            ('Shutdown Server', self.shutdownServer),
+            ('Restart Server (v1.65)', self.restartServer),
+            ('Exit', None)
         ]
 
         self.playermenu = []
+        self.missionmenu = []
         self.backMenu = [('Main Menu', self.getMainMenu)]
 
         self.__navigation = self.getMainMenu()
         self.__prevnav = None
         # menu cursor position
         self.position = 0
+        # is whitelist
+        self.isWhitelist = False
         # player cursor position
         self.playerpos = 0
         self.players = []
@@ -51,15 +53,18 @@ class RconGUI(object):
 
         try:
             self.screen = curses.initscr()
+
+            if not self.checkMaxSize():
+                curses.endwin()
+                print('THE TERMINAL WINDOW IS TO SMALL (width/height)')
+                return
+
             self.initColors()
 
             curses.cbreak()
             curses.noecho()
             curses.curs_set(0)
-
-            if not self.checkMaxSize():
-                raise Exception('THE TERMINAL WINDOW IS TO SMALL (width/height)')
-            
+           
             self.menuWnd = self.screen.subwin(*self.posAndSize['menu'])
             self.menuWnd.keypad(1)
 
@@ -70,9 +75,8 @@ class RconGUI(object):
 
             self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
-        except Exception, e:
-            self.exitCurses()
-            print "\nRconGUI Exception:", str(e)
+        except:
+            curses.endwin()
             raise
 
     def getMainMenu(self):
@@ -94,50 +98,90 @@ class RconGUI(object):
 
     def OnPlayers(self, playerList):
         self.players = playerList
-        self.switchNavigation('player')
+        self.isWhitelist = False
+        self.showPlayers()
+
+    def OnMissions(self, missionList):
+        self.missionmenu = missionList
+        self.missionmenu.append("Back")
+        self.showMissionMenu()
         
     def OnAbort(self):
         logging.debug("Quit GUI")
-        self.exitCurses()
+        curses.endwin()
 
     def shutdownServer(self):
         self.rcon.sendCommand('#shutdown')
 
-    def kickPlayer(self):
-        playerObj = self.players[self.playerpos]
-        logging.debug("Kicking player '%s'" % playerObj.name)
+    def restartServer(self):
+        self.rcon.sendCommand('#restartserver')
 
-        self.rcon.sendCommand('kick %s' % playerObj.number)
+    def restartMission(self):
+        m = self.missionmenu[self.position]
+        if m != 'Back':
+            self.rcon.sendCommand('#mission %s' % m)
+        return self.getMainMenu()
+
+    def kickPlayer(self):
+        player = self.players[self.playerpos]
+        logging.debug("Kicking player '%s'" % player.name)
+
+        self.rcon.sendCommand('kick %s' % player.number)
         return self.getMainMenu()
 
     def fetchPlayers(self):
+        self.isWhitelist = False
+        self.players = []
+        self.showPlayers()
         self.rcon.sendCommand('players')
 
-    def sayHello(self):
-        self.rcon.sendChat("Hello World!")
+    def fetchMissions(self):
+        self.rcon.sendCommand('missions')
+
+    def manageWhitelist(self):
+        clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+        self.players = clsWhitelist.whitelist
+        self.isWhitelist = True
+        self.showPlayers()
+    
+    def removePlayerWhitelist(self):
+        player = self.players[self.playerpos]
+        player.allowed = False
+
+        clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+        clsWhitelist.saveConfigAsync()
+
+        logging.info('Player removed from WHITELIST')
+        self.showPlayers()
+        return 'playermenu'
+
+    def addPlayerWhitelist(self):
+        player = self.players[self.playerpos]
+        player.allowed = True
+
+        clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
+        clsWhitelist.saveConfigAsync()
+
+        logging.info('Player removed from WHITELIST')
+        self.showPlayers()
+        return 'playermenu'
 
     def OnConnected(self):
         try:
             t = threading.Thread(target=self._menuThread)
             t.daemon = True
             t.start()
-
-            time.sleep(2)
-            self.fetchPlayers()
         except:
             logging.error(sys.exc_info())
 
     def _menuThread(self):
         try:
+            self.fetchPlayers()
             self.display()
         except:
             logging.error(sys.exc_info())
 
         self.rcon.Abort()
-
-    def exitCurses(self):
-        curses.nocbreak(); self.screen.keypad(0); curses.echo();
-        curses.endwin()
 
     def checkMaxSize(self):
         _res = True
@@ -166,7 +210,7 @@ class RconGUI(object):
 
         res = ''
         # clean up the menu window because other menus might have less info than the other
-        if self.__navigation == 'menu' or self.__navigation == 'playermenu':
+        if self.__navigation == 'menu' or self.__navigation == 'playermenu' or self.__navigation == 'missionmenu':
             res = self.inputMenu()
         elif self.__navigation == 'player':
             res = self.inputMenu()
@@ -176,10 +220,13 @@ class RconGUI(object):
         self.__navigation = res
 
     def navigate(self, n):
-        if self.__navigation == 'menu' or self.__navigation == 'playermenu':
+        if self.__navigation == 'menu' or self.__navigation == 'playermenu' or self.__navigation == 'missionmenu':
             _length = len(self.mainmenu)
             if self.__navigation == 'playermenu':
                 _length = len(self.playermenu)
+            elif self.__navigation == 'missionmenu':
+                _length = len(self.missionmenu)
+
             if (self.position + n) < 0:
                 self.position = 0
             elif (self.position + n) >= _length:
@@ -200,7 +247,7 @@ class RconGUI(object):
     def updateLog(self):
         time.sleep(2)
 
-        if self.rcon.IsAborted():
+        if self.rcon.isExit:
             return
 
         if not hasattr(self, 'logWnd'):
@@ -209,25 +256,38 @@ class RconGUI(object):
         self.logWnd.clear()
         self.logWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
 
-        maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 1
+        maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 2
         maxH = self.posAndSize['log'][0] - 1
 
-        lastlines = os.popen("tail -n %d %s" % (maxH, self.logFile)).read()
-        lines = lastlines.splitlines()
+        fp = open(self.logFile)
+        fp.seek(0, 2)
+        file_size = fp.tell()
+        
+        offset = file_size - 500
+        if offset < 0:
+            offset = 0
+
+        fp.seek(offset, 0)
+
+        lines = []
+        for chunk in iter(lambda: fp.readline(), ''):
+            lines.append( chunk )
+        
+        lines = lines[maxH * -1:]
 
         i = 1
         while(i < maxH and len(lines)):
             curLine = lines.pop()
             maxH - i
 
-            if len(curLine) > maxW:
-                self.logWnd.addstr(maxH - i, 1, curLine[maxW:])
+            if len(curLine) >= maxW:
+                self.logWnd.addstr(maxH - i, 2, curLine[maxW:].rstrip())
                 i += 1
                 curLine = curLine[:maxW]
                 if i >= maxH:
                     break
 
-            self.logWnd.addstr(maxH - i, 1, curLine)
+            self.logWnd.addstr(maxH - i, 2, curLine.rstrip())
             i += 1
 
         self.logWnd.refresh()
@@ -249,6 +309,18 @@ class RconGUI(object):
 
         self.menuWnd.refresh()
 
+    def showMissionMenu(self):
+        self.menuWnd.clear()
+        self.menuWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
+
+        for index, item in enumerate(self.missionmenu):
+            mode = curses.A_NORMAL
+            if index == self.position and self.__navigation == 'missionmenu':
+                mode = curses.color_pair(1)
+            self.menuWnd.addstr(1+index, 1, item, mode)
+
+        self.menuWnd.refresh()
+
     """
     Display the player menu, when player is selected
     """
@@ -259,8 +331,13 @@ class RconGUI(object):
         self.playermenu = list(self.backMenu)
 
         if len(self.players) > 0:
-            playerObj = self.players[self.playerpos]
-            self.playermenu.append( ('Kick %s' % playerObj.name, self.kickPlayer) )
+            player = self.players[self.playerpos]
+            self.playermenu.append( ('Kick %s' % player.name, self.kickPlayer) )
+            if player.allowed:
+                self.playermenu.append( ('Remove from Whitelist', self.removePlayerWhitelist) )
+            else:
+                self.playermenu.append( ('Add To Whitelist', self.addPlayerWhitelist) )
+            
 
         for index, item in enumerate(self.playermenu):
             mode = curses.A_NORMAL
@@ -289,7 +366,12 @@ class RconGUI(object):
 
             if index == self.playerpos and self.__navigation == 'player':
                 _m = curses.color_pair(1)
-            self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player.name, index), _m)
+            
+            if self.isWhitelist:
+                allowed = '[Y]' if player.allowed else '[N]'
+                self.playerWnd.addstr(1 + _row , _offsetX, "%s %s" % (allowed, player.name), _m)
+            else:
+                self.playerWnd.addstr(1 + _row , _offsetX, "%s #%d" % (player.name, index), _m)
             _row += 1
         self.playerWnd.refresh()
 
@@ -343,6 +425,9 @@ class RconGUI(object):
                 if self.position == len(self.mainmenu)-1:
                     _result = ''
                     return
+                elif self.position == 2:
+                    self.mainmenu[self.position][1]()
+                    _result = 'missionmenu'
                 else:
                     self.mainmenu[self.position][1]()
             elif self.__navigation == 'playermenu':
@@ -350,6 +435,10 @@ class RconGUI(object):
             elif self.__navigation == 'player':
                 self.position = 0
                 _result = 'playermenu'
+            elif self.__navigation == 'missionmenu':
+                _result = self.restartMission()
+                self.position = 0
+
         elif key == curses.KEY_UP:
             self.navigate( -1 )
         elif key == curses.KEY_DOWN:
@@ -371,7 +460,7 @@ class RconGUI(object):
 
     def display(self):
         try:
-            for k, v in self.navigation.iteritems():
+            for k, v in self.navigation.items():
                 if k != self.__navigation:
                     v()
 

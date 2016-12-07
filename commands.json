@@ -1,8 +1,9 @@
 {
-    "admins": ["d41d8cd98f00b204e9800998ecf8427e", "098f6bcd4621d373cade4e832627b4f6"],
+    "admins": ["45ff8444918ed4edd762891c1c5b17c1", "098f6bcd4621d373cade4e832627b4f6"],
     "commands": [
-	["!kickall","Rcon:kickAll"],
-	["!reload", "rconcommand:RconCommand:loadConfig"],
-	["!cancel", "rconrestart:RconRestart:cancelRestart"]
+        ["!help", "rconcommand:RconCommand:showHelp"],
+        ["!kickall","Rcon:kickAll"],
+        ["!reload", "rconcommand:RconCommand:loadConfig"],
+        ["!cancel", "rconrestart:RconRestart:cancelRestart"]
     ]
 }
