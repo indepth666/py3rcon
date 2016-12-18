@@ -1,5 +1,6 @@
 import socket, os, sys, binascii, time, datetime, threading, logging, importlib
 import re
+import json
 
 """
 Rcon protocol class.

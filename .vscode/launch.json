@@ -31,6 +31,22 @@
                 "BreakOnSystemExitZero",
                 "WaitOnAbnormalExit"
             ]
+        },
+        {
+            "name": "Py3rcon WEB",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "${config.python.pythonPath}",
+            "program": "${workspaceRoot}/py3rcon.py",
+            "args": [
+                "-w",
+                "config.json"
+            ],
+            "console": "externalTerminal",
+            "debugOptions": [
+                "BreakOnSystemExitZero",
+                "WaitOnAbnormalExit"
+            ]
         }
     ]
 }

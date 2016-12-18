@@ -11,10 +11,12 @@ _VER = '0.2'
 
 parser = argparse.ArgumentParser(description=_DESC)
 parser.add_argument('configfile', help='configuration file in JSON')
-parser.add_argument('-g','--gui', action='store_true',help='open the GUI - no other events are enabled')
+parser.add_argument('-g','--gui',action='store_true', help='open the GUI - no other events are enabled')
+parser.add_argument('-w', '--web',action='store_true', help='initialize a webserver providing some rcon features')
 args = parser.parse_args()
 
 GUI = args.gui
+WEB = args.web
 
 if not os.path.isfile(args.configfile):
     print('')
@@ -32,7 +34,7 @@ FORMAT = '%(asctime)-15s %(levelname)s %(message)s'
 logging.basicConfig(filename=config['logfile'], level=config['loglevel'], format=FORMAT)
 pidfile = '{}/py3rcon.{}.run'.format(tempfile.gettempdir(),config['server']['port'])
 
-if not(GUI):
+if not(GUI) and not(WEB):
     if os.path.isfile(pidfile):
         _tmp = 'pyrcon is already running for %s:%s' % (config['server']['host'], config['server']['port'])
         print(_tmp)
@@ -60,6 +62,8 @@ try:
         
     if GUI:
         rcon.loadmodule('rcongui', 'RconGUI', config)
+    elif WEB:
+        rcon.loadmodule('rconweb', 'RconWEB', config)
 
     # connect to server (async)
     rcon.connectAsync()
