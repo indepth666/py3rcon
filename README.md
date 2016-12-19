@@ -10,7 +10,7 @@ How to use?
 
 Configuration example can be found in configexample.json.
 
-<pre>Usage: ./py3rcon.py &lt;configfile&gt;</pre>
+<pre>Usage: ./py3rcon.py [-g | --gui] [-w | --web] &lt;configfile&gt;</pre>
 
 **PLEASE NOTE:**<br />
 Since version 1.58.1* of Arma 3 it is REQUIRED to add the line `RConPort <port>` into the beserver.cfg<br />
