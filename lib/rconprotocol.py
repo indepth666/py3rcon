@@ -380,6 +380,7 @@ class Rcon():
             logging.error('Socket timeout: {}'.format(et))
             if self.retry < self.ConnectionRetries and not self.isExit:
                 self.retry += 1
+                self.seq = 0
                 self.connect()
             else:
                 self.Abort()

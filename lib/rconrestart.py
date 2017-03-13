@@ -22,7 +22,7 @@ class RconRestart(object):
         self.canceled = False
         self.rcon = rcon
 
-        self.shutdownDelay = config['delay'] if 'delay' in config else 15
+        self.shutdownDelay = config['delay'] if 'delay' in config and config['delay'] >= 5 else 15
 
         self.setMessages(config['messages'])
         self.setInterval(config['interval'])
