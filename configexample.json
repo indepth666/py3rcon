@@ -10,6 +10,7 @@
 	"whitelist": "whitelist.json",
 	"restart": {
 		"interval": 240,
+		"delay": 15,
 		"exitonrestart": true,
 		"messages": [
 			[

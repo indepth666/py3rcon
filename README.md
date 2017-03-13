@@ -31,6 +31,7 @@ server : rcon_password  | yourPW         | Rcon password
 commands                | commands.json  | Commands configuration file in JSON format (rconcommand module)
 whitelist               | whitelist.json | stores the whitelisted players used by rconwhitelist module
 restart : interval      | 240            | Restart interval in minutes
+restart : delay         | 15             | Wait x seconds until shutdown after players have been kicked
 restart : exitonrestart | true           | End the application when restart interval has reached
 
 GUI
