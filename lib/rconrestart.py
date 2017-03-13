@@ -83,12 +83,12 @@ class RconRestart(object):
     private: the actual shutdown call (with some delay to make sure players are disconnected)
     """
     def _shutdownTask(self):
-        self.rcon.lockServer();
+        self.rcon.lockServer()
         self.rcon.kickAll()
 
         # wait some seconds before restarting
         logging.info('Delay the shutdown process')
-        time.sleep(30)
+        time.sleep(15)
 
         logging.info('Sending shutdown command')
         self.rcon.sendCommand('#shutdown')
