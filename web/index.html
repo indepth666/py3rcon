@@ -13,7 +13,7 @@
         </style>
     </head>
     <body>
-        <nav class="navbar navbar-inverse navbar-fixed-top">
+        <nav id="menu" class="navbar navbar-inverse navbar-fixed-top">
         <div class="container">
             <div class="navbar-header">
             <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
@@ -22,35 +22,42 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="#">Py3rcon WEB</a>
+            <a class="navbar-brand" href="index.html">Py3rcon WEB</a>
             </div>
             <div id="navbar" class="collapse navbar-collapse">
             <ul class="nav navbar-nav">
-                <li class="active"><a href="#">Players</a></li>
-                <li><a href="#server">Server</a></li>
-                <li><a href="#about">About</a></li>
+                <li><a href="about.html">About</a></li>
             </ul>
             </div><!--/.nav-collapse -->
         </div>
         </nav>
 
         <div class="container">
-            <div id="player" class="starter-template">
-                <h1>Players</h1>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Player Name</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-cloak v-for="item in players">
-                            <td>{{ item.name }}</td>
-                            <td><a href="#" class="btn btn-danger" @click="Kick(item)">Kick</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <h2>Server Management</h2>
+            <div class="alert alert-dismissable" :class="type" id="alert" v-show="visible">
+                <a href="#" v-show="allowClose" class="close" @click="Hide" aria-label="close">&times;</a>
+                {{ message }}
+            </div>
+            <div v-cloak id="player" class="starter-template">
+                <div>
+                    <a href="#" class="btn btn-primary" @click="Load">Refresh</a>
+                    <a href="#" class="btn btn-danger" @click="Shutdown">Shutdown</a>
+                    <a href="#" class="btn btn-danger" @click="Restart">Restart</a>
+                </div>
+                <div>&nbsp;</div>
+                
+                <div class="row">
+                    <div v-for="item in players" class="col-md-3 col-xs-12">
+                        <div class="well">
+                            <label>Name:</label>
+                            {{ item.name }}<br />
+                            <a href="#" class="btn btn-danger" @click="Kick(item)">Kick</a>
+                        </div>
+                    </div>
+                </div>
+                <h3>Log</h3>
+                <div class="well well-sm">
+                </div>
             </div>
         </div>
         <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
