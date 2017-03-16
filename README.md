@@ -1,5 +1,6 @@
 py3rcon
 ============
+<sup>Version: 0.2.1 | Authors: indepth666 (Basic protocol design), ole1986 (CLI)</sup>
 
 py3rcon is a Python3 client for Battleye Rcon protocol. 
 It's designed with ARMA2 and ARMA3 in mind but may also work with other implemenation of the protocol.
