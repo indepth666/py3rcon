@@ -87,3 +87,12 @@ When using the `--gui` argument, schedules like **repeating messages** and **res
 | (0 players in total)                                                                                        |
 #-------------------------------------------------------------------------------------------------------------#
 </pre>
+
+
+WEBSERVER
+========================
+Use the following command to run py3rcon as webserver
+
+<pre>Usage: ./py3rcon.py --web &lt;configfile&gt;</pre>
+
+By default the webserver will be available through http://localhost:8000
