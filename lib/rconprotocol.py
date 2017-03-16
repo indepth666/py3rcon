@@ -37,7 +37,7 @@ class Rcon():
         self.isExit = False
         self.isAuthenticated = False
         self.retry = 0
-        self.seq = 0
+
         self.lastcmd = ""
 
         # server message receive filters
@@ -113,7 +113,7 @@ class Rcon():
         command = bytearray()
         command.append(0xFF)
         command.append(0x01)
-        command.append(self.seq)
+        command.append(0x00)
 
         if toSendCommand:
             logging.debug('Sending command "{}"'.format(toSendCommand))
@@ -128,7 +128,6 @@ class Rcon():
         request.extend(command)
 
         self.s.sendto(request ,(self.ip, self.port))
-        self.seq += 1
 
     """
     private: send the magic bytes to login as Rcon admin.
@@ -154,6 +153,7 @@ class Rcon():
     More Info: http://www.battleye.com/downloads/BERConProtocol.txt
     """
     def _acknowledge(self, Bytes):
+        
         command = bytearray()
         command.append(0xFF)
         command.append(0x02)
@@ -162,6 +162,10 @@ class Rcon():
         request = bytearray(b'BE')
         request.extend( self.__compute_crc(command) )
         request.extend(command)
+
+        seqNo = Bytes[0]
+
+        logging.info('ACK seq:{}'.format(seqNo))
 
         return request
 
@@ -178,9 +182,7 @@ class Rcon():
         try:
             if p[0:2] == b'BE' and self.isAuthenticated:
                 self.s.sendto(self._acknowledge(p[8:9]), (self.ip, self.port))
-                self.seq -= 1
-                if self.seq < 0: self.seq = 0
-                    
+
         except:
             pass
         
@@ -268,9 +270,10 @@ class Rcon():
     """
     def kickAll(self):
         logging.info('Kick All player before restart take action')
+
         for i in range(1, 100):
             self.sendCommand('kick %s' % (i))
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     """
     public: lock the server (until next restart/unlock). So nobody can join anymore
