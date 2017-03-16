@@ -1,5 +1,6 @@
 py3rcon
 ============
+<sup>Version: 0.2.1 | Authors: indepth666 (Basic protocol design), ole1986 (CLI)</sup>
 
 py3rcon is a Python3 client for Battleye Rcon protocol. 
 It's designed with ARMA2 and ARMA3 in mind but may also work with other implemenation of the protocol.
@@ -31,6 +32,7 @@ server : rcon_password  | yourPW         | Rcon password
 commands                | commands.json  | Commands configuration file in JSON format (rconcommand module)
 whitelist               | whitelist.json | stores the whitelisted players used by rconwhitelist module
 restart : interval      | 240            | Restart interval in minutes
+restart : delay         | 15             | Wait x seconds until shutdown after players have been kicked
 restart : exitonrestart | true           | End the application when restart interval has reached
 
 GUI

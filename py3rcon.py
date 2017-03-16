@@ -7,7 +7,7 @@ from lib.rconprotocol import Rcon
 pid = str(os.getpid())
 
 _DESC = 'Python Rcon CLI for Arma servers'
-_VER = '0.2'
+_VER = '0.2.1'
 
 parser = argparse.ArgumentParser(description=_DESC)
 parser.add_argument('configfile', help='configuration file in JSON')

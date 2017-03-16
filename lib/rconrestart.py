@@ -18,9 +18,11 @@ class RconRestart(object):
         self.shutdownTimer = 0
         self.restartMessages = None
         self.exitOnRestart = False
-
+        self.inProgress = False
         self.canceled = False
         self.rcon = rcon
+
+        self.shutdownDelay = config['delay'] if 'delay' in config and config['delay'] >= 5 else 15
 
         self.setMessages(config['messages'])
         self.setInterval(config['interval'])
@@ -62,7 +64,7 @@ class RconRestart(object):
     When connection is established start the "restart" schedule
     """
     def OnConnected(self):
-        if self.shutdownTimer > 0:
+        if self.shutdownTimer > 0 and self.inProgress == False:
             # a separate thread to handle the restart and restart messages
             # It is set as daemon to be able to stop it using SystemExit or Ctrl + C
             t = threading.Thread(target=self._initRestartScheduler)
@@ -71,6 +73,17 @@ class RconRestart(object):
             logging.info('OnConnect(): %s ready to restart server every %d seconds' % (type(self).__name__, self.shutdownTimer))
         else:
             logging.info("OnConnect(): %s disabled" % type(self).__name__)
+
+    """
+    Event: Called from Rcon.OnReconnected()
+    """
+    def OnReconnected(self):
+        if self.shutdownTimer > 0 and self.inProgress == False:
+            # restart the module
+            t = threading.Thread(target=self._initRestartScheduler)
+            t.daemon = True
+            t.start()
+            logging.info('OnReconnect(): %s ready to restart server every %d seconds' % (type(self).__name__, self.shutdownTimer))
 
     """
     private: restart message to warn the players
@@ -83,15 +96,17 @@ class RconRestart(object):
     private: the actual shutdown call (with some delay to make sure players are disconnected)
     """
     def _shutdownTask(self):
-        self.rcon.lockServer();
+        self.inProgress = True
+        self.rcon.lockServer()
         self.rcon.kickAll()
 
         # wait some seconds before restarting
         logging.info('Delay the shutdown process')
-        time.sleep(30)
+        time.sleep(self.shutdownDelay)
 
         logging.info('Sending shutdown command')
         self.rcon.sendCommand('#shutdown')
+        self.inProgress = False
 
     """
     private: Clear all schedules
