@@ -11,6 +11,7 @@ PORT = 8000
 
 class RconWEB(object):
     Action = {}
+    DocRoot = '{}/web'.format( os.getcwd() )
 
     def __init__(self, rcon, config):
         self.rcon = rcon
@@ -68,6 +69,8 @@ class Handler(server.SimpleHTTPRequestHandler):
         if self.path in RconWEB.Action.keys():
             self.do_JSON( RconWEB.Action[self.path] )
             return
+
+        os.chdir(RconWEB.DocRoot)
         server.SimpleHTTPRequestHandler.do_GET(self)
 
     def do_POST(self):
