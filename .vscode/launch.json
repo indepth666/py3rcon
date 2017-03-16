@@ -5,12 +5,11 @@
             "name": "Py3rcon",
             "type": "python",
             "request": "launch",
-            "pythonPath": "${config.python.pythonPath}",
             "program": "${workspaceRoot}/py3rcon.py",
             "args": [
                 "config.json"
             ],
-            "console": "externalTerminal",
+            "console": "integratedTerminal",
             "debugOptions": [
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit"
@@ -20,7 +19,6 @@
             "name": "Py3rcon GUI",
             "type": "python",
             "request": "launch",
-            "pythonPath": "${config.python.pythonPath}",
             "program": "${workspaceRoot}/py3rcon.py",
             "args": [
                 "-g",
@@ -36,13 +34,13 @@
             "name": "Py3rcon WEB",
             "type": "python",
             "request": "launch",
-            "pythonPath": "${config.python.pythonPath}",
+            "pythonPath": "python3",
             "program": "${workspaceRoot}/py3rcon.py",
             "args": [
                 "-w",
                 "config.json"
             ],
-            "console": "externalTerminal",
+            "console": "integratedTerminal",
             "debugOptions": [
                 "BreakOnSystemExitZero",
                 "WaitOnAbnormalExit"

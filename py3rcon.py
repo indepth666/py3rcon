@@ -63,6 +63,10 @@ try:
     if GUI:
         rcon.loadmodule('rcongui', 'RconGUI', config)
     elif WEB:
+        if sys.version_info.major <= 2:
+            logging.error('PYTHON 3 IS REQUIRED')
+            print("PYTHON 3 IS REQUIRED")
+            exit()
         rcon.loadmodule('rconweb', 'RconWEB', config)
 
     # connect to server (async)
@@ -75,4 +79,4 @@ except (KeyboardInterrupt, SystemExit):
 except:
     raise
 finally:
-    if not(GUI): os.unlink(pidfile)
+    if not(GUI) and not(WEB): os.unlink(pidfile)
