@@ -44,6 +44,7 @@ class Rcon():
         self.receiveFilter = [
             # receive all players
             ("\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
+            ("\n\(0 players in total\)", self.__noplayers, False),
             # receive missions
             ("\n(.*\.[A-z0-9_-]+\.pbo)", self.__missions, True),
             # when player is connected
@@ -228,6 +229,9 @@ class Rcon():
             l.append( Player(m[0], m[3], m[4]) )
 
         self.OnPlayers(l)
+
+    def __noplayers(self, m):
+        self.OnNoPlayers()
     
     def __missions(self, missions):
         self.OnMissions(missions)
@@ -289,6 +293,11 @@ class Rcon():
         for clsObj in self.__instances.values():
             func = getattr(clsObj, 'OnPlayers', None)
             if func: func(playerList)
+
+    def OnNoPlayers(self):
+        for clsObj in self.__instances.values():
+            func = getattr(clsObj, 'OnNoPlayers', None)
+            if func: func()
 
     """
     Event: when mission files are requested

@@ -5,6 +5,7 @@ import http.server as server
 import socketserver
 import lib.rconprotocol
 from lib.rconprotocol import Player
+import queue as Queue
 
 PORT = 8000
 
@@ -18,6 +19,8 @@ class RconWEB(object):
         self.logFile = None
         self.players = [Player(1, "123-123-123", "test player 1"), Player(2, "223-123-123", "player 2")]
 
+        self.isAsync = False
+
         self.addActions()
 
     def addActions(self):
@@ -25,12 +28,9 @@ class RconWEB(object):
         RconWEB.Action['/action/kickplayer'] = self.Web_kickPlayer
         RconWEB.Action['/action/shutdown'] = self.Web_shutdownServer
         RconWEB.Action['/action/restart'] = self.Web_restartServer
-
         RconWEB.Action['/action/players'] = self.Web_refreshPlayers
-        RconWEB.Action['/action/getplayers'] = self.Web_getPlayers
 
     def OnConnected(self):
-        #self.Web_refreshPlayers()
         t = threading.Thread(target=self._initHTTP)
         t.daemon = True
         t.start()
@@ -39,8 +39,9 @@ class RconWEB(object):
         print('Serving HTTPd on port %s' % (PORT))
     
     def _initHTTP(self):
+        self.Web_refreshPlayers()
+
         httpd = socketserver.TCPServer(("", PORT), Handler)
-        
         httpd.serve_forever()
 
     def Web_kickAll(self):
@@ -48,7 +49,7 @@ class RconWEB(object):
         return json.dumps(True)
 
     def Web_kickPlayer(self, **args):
-        if args['ban'][0]:
+        if 'ban' in args:
             self.rcon.sendCommand('ban {}'.format(args['id'][0]))
         else:
             self.rcon.sendCommand('kick {}'.format(args['id'][0]))
@@ -64,26 +65,34 @@ class RconWEB(object):
         return json.dumps(True)
 
     def Web_refreshPlayers(self):
+        self.isAsync = True
         self.rcon.sendCommand('players')
-        return json.dumps(True)
+        
+        timeout = time.time() + 15
 
-    def Web_getPlayers(self):
+        while time.time() < timeout:
+            if not self.isAsync: break
+            time.sleep(1)
+
         result = "["
         for x in self.players:
             result += x.toJSON() + ","
-        result = result[:-1]
+        if len(self.players) > 0:
+            result = result[:-1]
         result += "]"
-        
+
         return result
-        
 
     """
     Event: is called whenever the players command is send
     """
     def OnPlayers(self, playerList):
         self.players = playerList
-        
+        self.isAsync = False
 
+    def OnNoPlayers(self):
+        self.players = []
+        self.isAsync = False
 
 class Handler(server.SimpleHTTPRequestHandler):
     def do_GET(self):

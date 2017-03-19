@@ -32,7 +32,7 @@ var playerVue = new Vue({
         Load: function(){
             var vm = this;
             AlertVue.Show('Loading...', 'alert-info');
-            $.getJSON('/action/getplayers', function (data) {
+            $.getJSON('/action/players', function (data) {
                 vm.players = data;
                 AlertVue.Hide();
             });
