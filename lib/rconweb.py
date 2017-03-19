@@ -23,14 +23,23 @@ class RconWEB(object):
     def addActions(self):
         RconWEB.Action['/action/kickall'] = self.Web_kickAll
         RconWEB.Action['/action/kickplayer'] = self.Web_kickPlayer
+        RconWEB.Action['/action/shutdown'] = self.Web_shutdownServer
+        RconWEB.Action['/action/restart'] = self.Web_restartServer
+
         RconWEB.Action['/action/players'] = self.Web_refreshPlayers
         RconWEB.Action['/action/getplayers'] = self.Web_getPlayers
 
     def OnConnected(self):
         #self.Web_refreshPlayers()
+        t = threading.Thread(target=self._initHTTP)
+        t.daemon = True
+        t.start()
 
+        logging.info('OnConnect(): Serving HTTPd on port %s ' % (PORT))
+        print('Serving HTTPd on port %s' % (PORT))
+    
+    def _initHTTP(self):
         httpd = socketserver.TCPServer(("", PORT), Handler)
-        print("serving at port %s" % (PORT))
         
         httpd.serve_forever()
 
@@ -39,7 +48,19 @@ class RconWEB(object):
         return json.dumps(True)
 
     def Web_kickPlayer(self, **args):
-        self.rcon.sendCommand('kick %s' % (args['id'][0]))
+        if args['ban'][0]:
+            self.rcon.sendCommand('ban {}'.format(args['id'][0]))
+        else:
+            self.rcon.sendCommand('kick {}'.format(args['id'][0]))
+
+        return json.dumps(True)
+
+    def Web_shutdownServer(self):
+        self.rcon.sendCommand('#shutdown')
+        return json.dumps(True)
+
+    def Web_restartServer(self):
+        self.rcon.sendCommand('#restartserver')
         return json.dumps(True)
 
     def Web_refreshPlayers(self):
@@ -72,6 +93,7 @@ class Handler(server.SimpleHTTPRequestHandler):
 
         os.chdir(RconWEB.DocRoot)
         server.SimpleHTTPRequestHandler.do_GET(self)
+        os.chdir('../')
 
     def do_POST(self):
         if self.path in RconWEB.Action.keys():

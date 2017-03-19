@@ -38,15 +38,20 @@ var playerVue = new Vue({
             });
         },
         Restart: function(){
-            AlertVue.Show('Not yet implemented', 'alert-info', true);
+            $.post('/action/restart', null, function(){
+                AlertVue.Show('Restart takes action...', 'alert-info');
+            });
         },
         Shutdown: function(){
-            AlertVue.Show('Not yet implemented', 'alert-info', true);
+            $.post('/action/shutdown', null, function(){
+                AlertVue.Show('Shutdown takes action...', 'alert-info');
+            });
         },
-        Kick: function(item){
+        Kick: function(item, ban){
             var vm = this;
+
             console.log(item);
-            $.post('/action/kickplayer', { id: item.number }, function (data) {
+            $.post('/action/kickplayer', { id: item.number, ban: ban }, function (data) {
                 var index = vm.players.indexOf(item);
                 vm.players.splice(index, 1);
             });

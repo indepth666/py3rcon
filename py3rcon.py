@@ -49,16 +49,15 @@ try:
     ##
     rcon = Rcon(config['server']['host'], config['server']['rcon_password'], config['server']['port'])
 
-    if not(GUI):
+    if not(GUI) and not(WEB):
         # Load the rconrestart module and setup from configuration
         rcon.loadmodule('rconrestart', 'RconRestart', config['restart'])
         # Load the rconmessage module and setup from configuration
         rcon.loadmodule('rconmessage', 'RconMessage', config['repeatMessage'])
         # Load the rcon admin commands module
         if 'commands' in config: rcon.loadmodule('rconcommand', 'RconCommand', config['commands'])
-
-    if 'whitelist' in config:
-        rcon.loadmodule('rconwhitelist', 'RconWhitelist', config['whitelist'], GUI)
+        if 'whitelist' in config:
+            rcon.loadmodule('rconwhitelist', 'RconWhitelist', config['whitelist'], GUI)
         
     if GUI:
         rcon.loadmodule('rcongui', 'RconGUI', config)

@@ -34,7 +34,6 @@
             "name": "Py3rcon WEB",
             "type": "python",
             "request": "launch",
-            "pythonPath": "python3",
             "program": "${workspaceRoot}/py3rcon.py",
             "args": [
                 "-w",
