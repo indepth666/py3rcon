@@ -91,6 +91,8 @@ When using the `--gui` argument, schedules like **repeating messages** and **res
 
 WEBSERVER
 ========================
+<sup>PLEASE NOTE: Python v3 is required</sup>
+
 Use the following command to run py3rcon as webserver
 
 <pre>Usage: ./py3rcon.py --web &lt;configfile&gt;</pre>
