@@ -96,3 +96,5 @@ Use the following command to run py3rcon as webserver
 <pre>Usage: ./py3rcon.py --web &lt;configfile&gt;</pre>
 
 By default the webserver will be available through http://localhost:8000
+
+![py3rcon-web](py3rcon-web.gif "py3rcon web")
