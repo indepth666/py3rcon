@@ -30,7 +30,7 @@ restart : interval      | 240            | Restart interval in minutes
 restart : delay         | 15             | Wait x seconds until shutdown after players have been kicked
 restart : exitonrestart | true           | End the application when restart interval has reached
 
-## GUI
+## Command GUI
 
 Display a command line GUI using ncurses
 
