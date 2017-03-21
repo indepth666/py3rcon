@@ -24,6 +24,7 @@ var playerVue = new Vue({
     el: '#player',
     data: {
         players: [],
+        log: []
     },
     mounted: function(){
         this.Load();
@@ -36,6 +37,12 @@ var playerVue = new Vue({
                 vm.players = data;
                 AlertVue.Hide();
             });
+
+            setInterval(function(){
+                $.getJSON('/action/log', function(data){
+                    vm.log = data;
+                });
+            }, 5000);
         },
         Restart: function(){
             $.post('/action/restart', null, function(){

@@ -16,7 +16,7 @@ class RconWEB(object):
 
     def __init__(self, rcon, config):
         self.rcon = rcon
-        self.logFile = None
+        self.logFile = config['logfile']
         self.players = [Player(1, "123-123-123", "test player 1"), Player(2, "223-123-123", "player 2")]
 
         self.isAsync = False
@@ -29,6 +29,7 @@ class RconWEB(object):
         RconWEB.Action['/action/shutdown'] = self.Web_shutdownServer
         RconWEB.Action['/action/restart'] = self.Web_restartServer
         RconWEB.Action['/action/players'] = self.Web_refreshPlayers
+        RconWEB.Action['/action/log'] = self.Web_logUpdate
 
     def OnConnected(self):
         t = threading.Thread(target=self._initHTTP)
@@ -55,6 +56,23 @@ class RconWEB(object):
             self.rcon.sendCommand('kick {}'.format(args['id'][0]))
 
         return json.dumps(True)
+
+    def Web_logUpdate(self):
+        fp = open(self.logFile)
+        fp.seek(0, 2)
+        file_size = fp.tell()
+        
+        offset = file_size - 500
+        if offset < 0:
+            offset = 0
+
+        fp.seek(offset, 0)
+
+        lines = []
+        for chunk in iter(lambda: fp.readline(), ''):
+            lines.append( chunk )
+
+        return json.dumps(lines)
 
     def Web_shutdownServer(self):
         self.rcon.sendCommand('#shutdown')
@@ -89,7 +107,9 @@ class RconWEB(object):
     def OnPlayers(self, playerList):
         self.players = playerList
         self.isAsync = False
-
+    """
+    Event: when no players are available
+    """
     def OnNoPlayers(self):
         self.players = []
         self.isAsync = False
