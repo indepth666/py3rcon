@@ -1,6 +1,12 @@
 #!/usr/bin/python -B
 
-import os, signal, sys, argparse, threading, json, logging, tempfile, time
+import os
+import sys
+import argparse
+import json
+import logging
+import tempfile
+import time
 import lib
 from lib.rconprotocol import Rcon
 
@@ -18,7 +24,7 @@ GUI = args.gui
 
 if not os.path.isfile(args.configfile):
     print('')
-    print(' -- Configuration not found: "{}" --\n').format(args.configfile)
+    print(' -- Configuration not found: "{}" --\n'.format(args.configfile))
     exit(1)
 
 with open(args.configfile) as json_config:
@@ -64,11 +70,11 @@ try:
     # connect to server (async)
     rcon.connectAsync()
     print("Press CTRL + C to Exit")
-    while rcon.isExit == False:
-        time.sleep(1)
+    rcon.exit_event.wait()
 except (KeyboardInterrupt, SystemExit):
     rcon.Abort()
-except:
+except Exception as e:
+    logging.exception("Unhandled exception in main loop")
     raise
 finally:
     if not(GUI): os.unlink(pidfile)

@@ -1,4 +1,9 @@
-import os, sys, logging, threading, time, curses
+import os
+import sys
+import logging
+import threading
+import time
+import curses
 from curses import panel
 from curses import textpad
 
@@ -75,8 +80,9 @@ class RconGUI(object):
 
             self.playerWnd = self.screen.subwin(*self.posAndSize['player'])
 
-        except:
+        except Exception as e:
             curses.endwin()
+            logging.error('Failed to initialize curses: {}'.format(e))
             raise
 
     def getMainMenu(self):
@@ -162,24 +168,24 @@ class RconGUI(object):
         clsWhitelist = self.rcon.loadmodule('rconwhitelist', 'RconWhitelist')
         clsWhitelist.saveConfigAsync()
 
-        logging.info('Player removed from WHITELIST')
+        logging.info('Player added to WHITELIST')
         self.showPlayers()
         return 'playermenu'
 
     def OnConnected(self):
         try:
-            t = threading.Thread(target=self._menuThread)
+            t = threading.Thread(target=self._menuThread, name='menuThread')
             t.daemon = True
             t.start()
-        except:
-            logging.error(sys.exc_info())
+        except Exception as e:
+            logging.exception('Failed to start menu thread: {}'.format(e))
 
     def _menuThread(self):
         try:
             self.fetchPlayers()
             self.display()
-        except:
-            logging.error(sys.exc_info())
+        except Exception as e:
+            logging.exception('Error in menu thread: {}'.format(e))
 
         self.rcon.Abort()
 
@@ -245,53 +251,55 @@ class RconGUI(object):
     Thread to update the log file using N last lines (calculated)
     """
     def updateLog(self):
-        time.sleep(2)
+        while not self.rcon.isExit:
+            time.sleep(2)
 
-        if self.rcon.isExit:
-            return
+            if not hasattr(self, 'logWnd'):
+                continue
 
-        if not hasattr(self, 'logWnd'):
-            return
+            try:
+                self.logWnd.clear()
+                self.logWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
 
-        self.logWnd.clear()
-        self.logWnd.border("|", "|", "-", "-", "#", "#", "#", "#")
+                maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 2
+                maxH = self.posAndSize['log'][0] - 1
 
-        maxW = self.posAndSize['log'][1] - self.posAndSize['log'][3] - 2
-        maxH = self.posAndSize['log'][0] - 1
+                with open(self.logFile, 'r') as fp:
+                    fp.seek(0, 2)
+                    file_size = fp.tell()
 
-        fp = open(self.logFile)
-        fp.seek(0, 2)
-        file_size = fp.tell()
-        
-        offset = file_size - 500
-        if offset < 0:
-            offset = 0
+                    offset = file_size - 500
+                    if offset < 0:
+                        offset = 0
 
-        fp.seek(offset, 0)
+                    fp.seek(offset, 0)
 
-        lines = []
-        for chunk in iter(lambda: fp.readline(), ''):
-            lines.append( chunk )
-        
-        lines = lines[maxH * -1:]
+                    lines = []
+                    while True:
+                        chunk = fp.readline()
+                        if not chunk:
+                            break
+                        lines.append(chunk)
 
-        i = 1
-        while(i < maxH and len(lines)):
-            curLine = lines.pop()
-            maxH - i
+                    lines = lines[maxH * -1:]
 
-            if len(curLine) >= maxW:
-                self.logWnd.addstr(maxH - i, 2, curLine[maxW:].rstrip())
-                i += 1
-                curLine = curLine[:maxW]
-                if i >= maxH:
-                    break
+                    i = 1
+                    while(i < maxH and len(lines)):
+                        curLine = lines.pop()
 
-            self.logWnd.addstr(maxH - i, 2, curLine.rstrip())
-            i += 1
+                        if len(curLine) >= maxW:
+                            self.logWnd.addstr(maxH - i, 2, curLine[maxW:].rstrip())
+                            i += 1
+                            curLine = curLine[:maxW]
+                            if i >= maxH:
+                                break
 
-        self.logWnd.refresh()
-        self.updateLog()
+                        self.logWnd.addstr(maxH - i, 2, curLine.rstrip())
+                        i += 1
+
+                self.logWnd.refresh()
+            except Exception as e:
+                logging.debug('Error updating log display: {}'.format(e))
 
     """
     Display the main menu
@@ -468,6 +476,6 @@ class RconGUI(object):
                 self.switchNavigation()
 
         except (KeyboardInterrupt, SystemExit):
-            logging.error(sys.exc_info())
-        except:
-            logging.error(sys.exc_info())
+            logging.info('GUI interrupted by user')
+        except Exception as e:
+            logging.exception('Error in display loop: {}'.format(e))

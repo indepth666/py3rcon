@@ -1,4 +1,12 @@
-import socket, os, sys, binascii, time, datetime, threading, logging, importlib
+import socket
+import os
+import sys
+import binascii
+import time
+import datetime
+import threading
+import logging
+import importlib
 import re
 
 """
@@ -32,25 +40,39 @@ class Rcon():
         # module instances as dict (to have them loaded only once)
         self.__instances = {}
 
-        # last timestamp used for checkinh keepalive
+        # last timestamp used for checking keepalive
         self.isExit = False
         self.isAuthenticated = False
         self.retry = 0
+        self.exit_event = threading.Event()
 
         self.lastcmd = ""
+        self.lastcmd_lock = threading.Lock()
+
+        # Store last known player list for operations like kickAll
+        self.current_players = []
+        self.players_lock = threading.Lock()
+
+        # Command pipeline with sequence numbers
+        self.seq_number = 0
+        self.seq_lock = threading.Lock()
+        self.pending_commands = {}  # seq_number -> {'cmd': str, 'sent_at': time, 'retries': int}
+        self.pending_lock = threading.Lock()
+        self.command_timeout = 5.0  # seconds
+        self.max_retries = 3
 
         # server message receive filters
         self.receiveFilter = [
             # receive all players
-            ("\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
+            (r"\n(\d+)\s+(.*?)\s+([0-9]+)\s+([A-z0-9]{32})\(.*?\)\s(.*)", self.__players, True),
             # receive missions
-            ("\n(.*\.[A-z0-9_-]+\.pbo)", self.__missions, True),
+            (r"\n(.*\.[A-z0-9_-]+\.pbo)", self.__missions, True),
             # when player is connected
-            ("Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", self.__playerConnect, False),
+            (r"Verified GUID \(([A-Fa-f0-9]+)\) of player #([0-9]+) (.*)", self.__playerConnect, False),
             # when player is disconnected
-            ("Player #([0-9]+) (.*?) disconnected", self.__playerDisconnect, False),
+            (r"Player #([0-9]+) (.*?) disconnected", self.__playerDisconnect, False),
             # chat messages
-            ("\((\w+)\) (.*?): (.*)", self.__chatMessage, False),
+            (r"\((\w+)\) (.*?): (.*)", self.__chatMessage, False),
         ]
 
         try:
@@ -84,49 +106,209 @@ class Rcon():
     Use the KeepAlive constant to define the interval
     """
     def _keepAliveThread(self):
-        time.sleep(self.KeepAlive)
-        self.sendCommand(None)
-        if not self.isExit:
-            self._keepAliveThread()
+        while not self.isExit:
+            time.sleep(self.KeepAlive)
+            if not self.isExit:
+                self.sendCommand(None, track=False)
+
+    """
+    private: threaded method to monitor pending commands and handle retransmissions
+    """
+    def _retryThread(self):
+        while not self.isExit:
+            time.sleep(1.0)  # Check every second
+
+            if self.isExit:
+                break
+
+            current_time = time.time()
+            commands_to_retry = []
+            commands_to_drop = []
+
+            # Check for timed out commands
+            with self.pending_lock:
+                for seq, cmd_info in list(self.pending_commands.items()):
+                    age = current_time - cmd_info['sent_at']
+
+                    if age > self.command_timeout:
+                        if cmd_info['retries'] < self.max_retries:
+                            # Retry this command
+                            commands_to_retry.append((seq, cmd_info))
+                            cmd_info['sent_at'] = current_time
+                            cmd_info['retries'] += 1
+                        else:
+                            # Max retries reached, drop it
+                            commands_to_drop.append(seq)
+
+            # Retransmit timed out commands
+            for seq, cmd_info in commands_to_retry:
+                logging.warning('Retransmitting seq {} (retry {}/{}): "{}"'.format(
+                    seq, cmd_info['retries'], self.max_retries, cmd_info['cmd']))
+                # Resend with same sequence number
+                self._resendCommand(seq, cmd_info['cmd'])
+
+            # Drop commands that exceeded max retries
+            with self.pending_lock:
+                for seq in commands_to_drop:
+                    cmd_info = self.pending_commands.pop(seq, None)
+                    if cmd_info:
+                        logging.error('Command failed after {} retries (seq {}): "{}"'.format(
+                            self.max_retries, seq, cmd_info['cmd']))
+
+    """
+    private: resend a command with a specific sequence number
+    """
+    def _resendCommand(self, seq, cmd_str):
+        if not self.isAuthenticated:
+            return
+
+        command = bytearray()
+        command.append(0xFF)
+        command.append(0x01)
+        command.append(seq)
+        command.extend(cmd_str.encode('utf-8','replace'))
+
+        request = bytearray(b'BE')
+        request.extend(self.__compute_crc(command))
+        request.extend(command)
+
+        self.s.sendto(request, (self.ip, self.port))
 
     """
     private: to calculate the crc (Battleye).
     More Info: http://www.battleye.com/downloads/BERConProtocol.txt
     """
     def __compute_crc(self, Bytes):
-        buf = memoryview(Bytes)
-        crc = binascii.crc32(buf) & 0xffffffff
-        crc32 = '0x%08x' % crc
-        return int(crc32[8:10], 16), int(crc32[6:8], 16), int(crc32[4:6], 16), int(crc32[2:4], 16)
+        crc = binascii.crc32(Bytes) & 0xffffffff
+        return (
+            (crc >> 0) & 0xFF,
+            (crc >> 8) & 0xFF,
+            (crc >> 16) & 0xFF,
+            (crc >> 24) & 0xFF
+        )
+
+    """
+    private: get next sequence number (0-255, wraps around)
+    """
+    def _get_next_seq(self):
+        with self.seq_lock:
+            seq = self.seq_number
+            self.seq_number = (self.seq_number + 1) % 256
+            return seq
 
     """
     public: send individual server commands.
     @param string toSendCommand - any valid server command, like "#ban <playerid>"
+    @param bool track - whether to track this command for ACK (default True)
+    @return int - sequence number used
     """
-    def sendCommand(self, toSendCommand):
+    def sendCommand(self, toSendCommand, track=True):
         if not self.isAuthenticated:
             logging.error('Command failed - Not Authenticated')
-            return
+            return None
+
+        # Get sequence number
+        seq = self._get_next_seq()
 
         # request =  "B" + "E" + 4 bytes crc check + command
         command = bytearray()
         command.append(0xFF)
         command.append(0x01)
-        command.append(0x00)
+        command.append(seq)  # Use actual sequence number instead of 0x00
 
         if toSendCommand:
-            logging.debug('Sending command "{}"'.format(toSendCommand))
+            logging.debug('Sending command "{}" with seq {}'.format(toSendCommand, seq))
             command.extend(toSendCommand.encode('utf-8','replace'))
         else:
-            logging.debug('Sending keepAlive package')
+            logging.debug('Sending keepAlive package with seq {}'.format(seq))
 
-        self.lastcmd = toSendCommand
+        # Track command in pending queue if requested
+        if track and toSendCommand:
+            with self.pending_lock:
+                self.pending_commands[seq] = {
+                    'cmd': toSendCommand,
+                    'sent_at': time.time(),
+                    'retries': 0
+                }
+
+        with self.lastcmd_lock:
+            self.lastcmd = toSendCommand
 
         request = bytearray(b'BE')
         request.extend( self.__compute_crc(command) )
         request.extend(command)
 
         self.s.sendto(request ,(self.ip, self.port))
+        return seq
+
+    """
+    public: send multiple commands in pipeline (fast batch processing)
+    @param list commands - List of command strings to send
+    @param float delay_between - Small delay between sends to avoid overwhelming server (default 0.001s)
+    @param float timeout - Max time to wait for all ACKs (default 10s)
+    @return dict - {'sent': int, 'acked': int, 'failed': list}
+    """
+    def sendBatch(self, commands, delay_between=0.001, timeout=10.0):
+        if not self.isAuthenticated:
+            logging.error('Batch commands failed - Not Authenticated')
+            return {'sent': 0, 'acked': 0, 'failed': []}
+
+        if not commands:
+            return {'sent': 0, 'acked': 0, 'failed': []}
+
+        logging.info('Sending batch of {} commands'.format(len(commands)))
+
+        # Send all commands and track their sequence numbers
+        seq_list = []
+        start_time = time.time()
+
+        for cmd in commands:
+            if self.isExit:
+                break
+
+            seq = self.sendCommand(cmd, track=True)
+            if seq is not None:
+                seq_list.append(seq)
+
+            # Small delay to avoid overwhelming the server
+            if delay_between > 0:
+                time.sleep(delay_between)
+
+        sent_count = len(seq_list)
+        logging.info('Batch sent: {} commands in {:.3f}s'.format(sent_count, time.time() - start_time))
+
+        # Wait for all ACKs with timeout
+        wait_start = time.time()
+        failed_seqs = []
+
+        while (time.time() - wait_start) < timeout:
+            with self.pending_lock:
+                # Check which commands are still pending
+                pending_seqs = [seq for seq in seq_list if seq in self.pending_commands]
+
+            if not pending_seqs:
+                # All commands acknowledged!
+                elapsed = time.time() - start_time
+                logging.info('Batch completed: {}/{} ACKed in {:.3f}s'.format(sent_count, sent_count, elapsed))
+                return {'sent': sent_count, 'acked': sent_count, 'failed': []}
+
+            # Small sleep to avoid busy waiting
+            time.sleep(0.01)
+
+        # Timeout reached - check what's still pending
+        with self.pending_lock:
+            for seq in seq_list:
+                if seq in self.pending_commands:
+                    failed_seqs.append(seq)
+                    cmd_info = self.pending_commands[seq]
+                    logging.warning('Command timeout: seq {} - "{}"'.format(seq, cmd_info['cmd']))
+
+        acked_count = sent_count - len(failed_seqs)
+        elapsed = time.time() - start_time
+        logging.warning('Batch timeout: {}/{} ACKed, {} failed in {:.3f}s'.format(
+            acked_count, sent_count, len(failed_seqs), elapsed))
+
+        return {'sent': sent_count, 'acked': acked_count, 'failed': failed_seqs}
 
     """
     private: send the magic bytes to login as Rcon admin.
@@ -173,7 +355,7 @@ class Rcon():
     @param unknown packet - received package
     """
     def __streamReader(self, packet):
-        # reset the retries if from now one some connection problems occured
+        # reset the retries if from now on some connection problems occurred
         self.retry = 0
 
         #ACKNOWLEDGE THE MESSAGE
@@ -182,38 +364,56 @@ class Rcon():
             if p[0:2] == b'BE' and self.isAuthenticated:
                 self.s.sendto(self._acknowledge(p[8:9]), (self.ip, self.port))
 
-        except:
-            pass
+        except (IndexError, socket.error) as e:
+            logging.debug('Failed to send acknowledgement: {}'.format(e))
         
         # Debug output the complete packet received from server
         logging.debug("[Server: %s:%s]: %s" % (self.ip, self.port, packet))
 
         stream = packet[0]
 
-        # successfully authenticad packet received
+        # successfully authenticated packet received
         if stream[6:] == b'\xff\x00\x01':
             self.s.settimeout( self.Timeout )
-            logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, "Authenticated"))
             # Only do the below if this is the initial connect call
             if not self.isAuthenticated:
                 self.isAuthenticated = True
+                logging.info("Successfully connected and authenticated to {}:{}".format(self.ip, self.port))
+                print("Connected to RCON server {}:{}".format(self.ip, self.port))
                 self.OnConnected()
             else:
+                logging.info("Reconnected to {}:{}".format(self.ip, self.port))
+                print("Reconnected to RCON server")
                 self.OnReconnected()
             return
         # when authentication failed, exit the program
         if stream[6:] == b'\xff\x00\x00':
-            logging.error("Not Authenticated")
+            logging.error("Authentication FAILED - Wrong password for {}:{}".format(self.ip, self.port))
+            print("ERROR: Authentication FAILED - Wrong RCON password!")
+            print("Check your password in the config file")
             exit()
         
-        # ausume when the last command is empty, its a keepAlive packet
-        if stream[6:8] == b'\xff\x01' and not self.lastcmd:
-            logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, "KeepAlive"))
-            return
+        # Handle ACK for commands (0xFF 0x01 = command response)
+        if stream[6:8] == b'\xff\x01':
+            # Extract sequence number from ACK
+            if len(stream) > 8:
+                ack_seq = stream[8]
+                logging.debug('Received ACK for seq {}'.format(ack_seq))
 
-        # success message from the server for the previous command (or keep alive)
-        if stream[6:9] == b'\xff\x01' and self.lastcmd:
-            logging.info("[Server: %s:%s]: %s" % (self.ip, self.port, "ACK " + self.lastcmd))
+                # Remove from pending commands
+                with self.pending_lock:
+                    if ack_seq in self.pending_commands:
+                        cmd_info = self.pending_commands.pop(ack_seq)
+                        logging.info("[Server: %s:%s]: ACK seq %d - '%s'" % (self.ip, self.port, ack_seq, cmd_info['cmd']))
+                    else:
+                        logging.debug('ACK for seq {} (not tracked or already removed)'.format(ack_seq))
+
+            # Legacy lastcmd handling for backwards compatibility
+            with self.lastcmd_lock:
+                if self.lastcmd:
+                    logging.debug('Command completed: {}'.format(self.lastcmd))
+                else:
+                    logging.info("[Server: %s:%s]: KeepAlive ACK" % (self.ip, self.port))
         # all other packages and commands
         if len(stream[9:]) > 0:
             stream = stream[9:].decode('utf-8', 'replace')
@@ -225,6 +425,9 @@ class Rcon():
         l = []
         for m in pl:
             l.append( Player(m[0], m[3], m[4]) )
+
+        with self.players_lock:
+            self.current_players = l
 
         self.OnPlayers(l)
     
@@ -265,14 +468,39 @@ class Rcon():
         self.sendCommand("say %s \"%s\"" % (ident,msg))
 
     """
-    public: kick all players
+    public: kick all players (using batch pipeline for speed)
     """
     def kickAll(self):
-        logging.info('Kick All player before restart take action')
+        logging.info('Kick All players before restart')
 
-        for i in range(1, 100):
-            self.sendCommand('kick %s' % (i))
-            time.sleep(0.05)
+        with self.players_lock:
+            players_to_kick = list(self.current_players)
+
+        if not players_to_kick:
+            logging.warning('No players in current player list, requesting player list first')
+            self.sendCommand('players', track=False)
+            time.sleep(0.5)  # Wait for response
+            with self.players_lock:
+                players_to_kick = list(self.current_players)
+
+        if not players_to_kick:
+            logging.info('No players to kick')
+            return {'sent': 0, 'acked': 0, 'failed': []}
+
+        # Build batch of kick commands
+        kick_commands = ['kick {}'.format(player.number) for player in players_to_kick]
+        logging.info('Kicking {} players using pipeline: {}'.format(
+            len(players_to_kick),
+            ', '.join([p.name for p in players_to_kick])
+        ))
+
+        # Send all kicks in pipeline (much faster than sequential)
+        result = self.sendBatch(kick_commands, delay_between=0.005, timeout=5.0)
+
+        if result['failed']:
+            logging.warning('Failed to kick {} players'.format(len(result['failed'])))
+
+        return result
 
     """
     public: lock the server (until next restart/unlock). So nobody can join anymore
@@ -328,9 +556,14 @@ class Rcon():
     """
     def OnConnected(self):
         # initialize keepAlive thread
-        _t = threading.Thread(target=self._keepAliveThread)
+        _t = threading.Thread(target=self._keepAliveThread, name='keepAliveThread')
         _t.daemon = True
         _t.start()
+
+        # initialize retry/timeout thread
+        _r = threading.Thread(target=self._retryThread, name='retryThread')
+        _r.daemon = True
+        _r.start()
 
         for clsObj in self.__instances.values():
             func = getattr(clsObj, 'OnConnected', None)
@@ -356,7 +589,13 @@ class Rcon():
     def Abort(self):
         logging.info("Exit loop")
         self.isExit = True
+        self.exit_event.set()
         self.OnAbort()
+        try:
+            self.s.close()
+            logging.debug("Socket closed")
+        except Exception as e:
+            logging.debug("Error closing socket: {}".format(e))
 
     def connectAsync(self):
         _t = threading.Thread(target=self.connect, name='connectionThread')
@@ -369,22 +608,36 @@ class Rcon():
     def connect(self):
         try:
             self.s.settimeout(self.ConnectionInterval)
-            #Set the whole string
-            logging.info('Connecting to {}:{} #{}'.format(self.ip, self.port, self.retry))
+
+            if self.retry == 0:
+                logging.info('Attempting to connect to RCON server {}:{}'.format(self.ip, self.port))
+                print('Connecting to {}:{}...'.format(self.ip, self.port))
+            else:
+                logging.info('Connecting to {}:{} (retry #{})'.format(self.ip, self.port, self.retry))
+
             self.s.sendto(self._sendLogin(self.password) ,(self.ip, self.port))
 
             # receive data from client (data, addr)
             while not self.isExit:
-                d = self.s.recvfrom(2048)           #1024 value crash on players request on full server
+                d = self.s.recvfrom(4096)           # Increased from 2048 to handle larger responses
                 self.__streamReader(d)
 
         # Connection timed out
         except socket.timeout as et:
-            logging.error('Socket timeout: {}'.format(et))
             if self.retry < self.ConnectionRetries and not self.isExit:
                 self.retry += 1
+                logging.warning('Connection timeout (attempt {}/{}): {} - Retrying in {}s...'.format(
+                    self.retry, self.ConnectionRetries, et, self.ConnectionInterval))
+                print('WARNING: Connection timeout (attempt {}/{}) - Retrying...'.format(
+                    self.retry, self.ConnectionRetries))
                 self.connect()
             else:
+                logging.error('Connection failed after {} retries: {}'.format(self.ConnectionRetries, et))
+                print('ERROR: Connection FAILED - Cannot reach RCON server at {}:{}'.format(self.ip, self.port))
+                print('Make sure:')
+                print('  1. The server is running')
+                print('  2. RCON is enabled on port {}'.format(self.port))
+                print('  3. The password is correct')
                 self.Abort()
 
         # Some problem sending data ??
@@ -397,8 +650,8 @@ class Rcon():
             logging.debug('rconprotocol.connect: Keyboard interrupted')
             self.Abort()
 
-        except:
-            logging.exception("Unhandled Exception")
+        except Exception:
+            logging.exception("Unhandled Exception in connect()")
             self.Abort()
 
 

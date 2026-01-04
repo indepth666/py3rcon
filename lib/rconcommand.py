@@ -1,5 +1,10 @@
-import os, logging, time, re, json
+import os
+import logging
+import time
+import re
+import json
 import inspect
+import threading
 import lib.rconprotocol
 
 """
@@ -12,6 +17,7 @@ class RconCommand(object):
         self.adminList = []
         self.cmdList = []
         self.players = []
+        self.players_lock = threading.Lock()
 
         self.rcon = rcon
 
@@ -80,19 +86,21 @@ class RconCommand(object):
         if player.guid in self.adminList:
             self.rcon.sendChat("Admin '%s' connected" % player.name)
 
-        self.players.append(player)
+        with self.players_lock:
+            self.players.append(player)
 
     """
     Event: Called by Rcon.OnPlayerDisconnect(Player)
-    Used to do some action when a player disconnected   
+    Used to do some action when a player disconnected
     """
     def OnPlayerDisconnect(self, player):
         # do some action when player disconnects
         logging.debug('OnPlayerDisconnect(): %s - Player: %s' % (type(self).__name__, player.name))
 
-        found = list(filter(lambda x: x.number == player.number, self.players))
-        if(len(found) > 0):
-            self.players.remove(found[0])
+        with self.players_lock:
+            found = list(filter(lambda x: x.number == player.number, self.players))
+            if(len(found) > 0):
+                self.players.remove(found[0])
 
     """
     Event: Called by Rcon.OnChat(ChatMessage)
@@ -102,13 +110,14 @@ class RconCommand(object):
         # do some action when player sends a chat message
         logging.info("RconCommand: %s - %s" % (obj.channel, obj.message))
         try:
-            found = [x for x in self.players if x.name == obj.sender]
+            with self.players_lock:
+                found = [x for x in self.players if x.name == obj.sender]
             if len(found) > 0 and found[0].guid in self.adminList:
                 for c in self.cmdList:
                     logging.info(c)
                     if c.Match(obj.message):
                         c.Execute(self.rcon, found[0])
-        except:
+        except Exception:
             logging.warning("Error in message: %s" % obj.message)
             logging.exception("Stack Trace:")
 
@@ -134,7 +143,8 @@ class RconCommandItem():
         elif len(param) >= 3:
             clsObj = rcon.loadmodule( param[0], param[1] )
             func = getattr(clsObj, param[2])
-            if len(inspect.getargspec(func).args) > 1:
+            sig = inspect.signature(func)
+            if len(sig.parameters) > 1:
                 func(player)
             else:
                 func()
